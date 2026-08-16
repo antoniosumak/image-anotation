@@ -51,7 +51,10 @@ One seam and a ring of thin adapters around it.
   decodes an image's natural size.
 - **`src/components/capture-editor.tsx`** — translates pointer events into
   intents and draws what the core reports. It holds no region state of its own,
-  and owns the object URL behind the design reference the core names.
+  and owns the object URL behind the design reference the core names. It also
+  owns the **stage**: the capture is drawn to fit a fixed area of the screen
+  rather than at its own size, so a 3000px export can't lay the app out. See
+  `docs/adr/0002` and `src/lib/capture-fit.ts`.
 
 Nothing here resolves a region to code — no CSS selectors, no component names,
 no coordinates standing in for them. See `docs/adr/0001`.

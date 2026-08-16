@@ -1,3 +1,4 @@
+import { ImagePlus, X } from 'lucide-react'
 import { useState } from 'react'
 
 import {
@@ -5,6 +6,7 @@ import {
   UNREADABLE_IMAGE_MESSAGE,
   imageFromTransfer,
 } from '#/adapters/transfer'
+import { PanelHeading } from '#/components/panel-heading'
 import { Button } from '#/components/ui/button'
 import type { DesignReference } from '#/editor/types'
 import { cn } from '#/lib/utils'
@@ -57,10 +59,7 @@ export function DesignReferencePanel({
     // region with it.
     <section
       {...{ [TAKES_IMAGES_ATTRIBUTE]: '' }}
-      className={cn(
-        'flex w-96 shrink-0 flex-col gap-3',
-        dragging && 'cursor-copy',
-      )}
+      className={cn('flex flex-col gap-3 p-4', dragging && 'cursor-copy')}
       onDragOver={(event) => {
         event.preventDefault()
         setDragging(true)
@@ -72,7 +71,24 @@ export function DesignReferencePanel({
         void take(event.dataTransfer)
       }}
     >
-      <h2 className="text-sm font-medium">Design reference</h2>
+      <div className="flex items-center justify-between gap-2">
+        <PanelHeading>Design reference</PanelHeading>
+
+        {designReference ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground hover:text-destructive -my-1 size-6"
+            aria-label="Remove design reference"
+            onClick={() => {
+              setError(null)
+              onRemove()
+            }}
+          >
+            <X className="size-3.5" />
+          </Button>
+        ) : null}
+      </div>
 
       {/* Focusable, because a paste goes to whatever has focus: clicking here
           is how the developer says this paste is a design reference rather
@@ -81,9 +97,9 @@ export function DesignReferencePanel({
         tabIndex={0}
         aria-label="Design reference — paste or drop an image"
         className={cn(
-          'focus-visible:border-ring focus-visible:ring-ring/50 rounded-lg border border-dashed p-2 outline-none focus-visible:ring-[3px]',
+          'focus-visible:border-ring focus-visible:ring-ring/50 border-border rounded-lg border border-dashed outline-none transition-colors focus-visible:ring-[3px]',
+          designReference ? 'bg-card p-1.5' : 'p-6',
           dragging && 'border-ring bg-accent',
-          !designReference && 'text-muted-foreground p-6 text-center text-sm',
         )}
         onPaste={(event) => {
           event.preventDefault()
@@ -96,37 +112,29 @@ export function DesignReferencePanel({
           <img
             src={designReference.src}
             alt="Design reference"
-            className="block h-auto max-w-full"
+            className="block h-auto max-w-full rounded"
           />
         ) : (
-          <p>
-            Drop the intended design here, or click and press{' '}
-            <kbd className="font-mono">Ctrl/Cmd + V</kbd>. Optional — everything
-            works without one.
-          </p>
+          <div className="text-muted-foreground flex flex-col items-center gap-2.5 text-center">
+            <ImagePlus className="size-4" />
+            <p className="text-[13px] leading-relaxed">
+              Drop the intended design here, or click and paste. Optional —
+              everything works without one.
+            </p>
+          </div>
         )}
       </div>
 
-      {error ? <p className="text-destructive text-sm">{error}</p> : null}
+      {error ? <p className="text-destructive text-[13px]">{error}</p> : null}
 
       {designReference ? (
-        <div className="flex items-start justify-between gap-2">
-          <p className="text-muted-foreground text-sm">
-            {designReference.width} × {designReference.height}, carried into the
-            report at that size. Drop or paste another to replace it.
-          </p>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground hover:text-destructive -mt-1"
-            onClick={() => {
-              setError(null)
-              onRemove()
-            }}
-          >
-            Remove
-          </Button>
-        </div>
+        <p className="text-muted-foreground text-xs">
+          <span className="tabular-nums">
+            {designReference.width} × {designReference.height}
+          </span>
+          , carried into the report at that size. Drop or paste another to
+          replace it.
+        </p>
       ) : null}
     </section>
   )

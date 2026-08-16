@@ -8,7 +8,12 @@ export type Bounds = { x: number; y: number; width: number; height: number }
 export type LoadedImage = {
   /** Where the adapter can load the pixels from — an object URL or data URL. */
   src: string
-  /** Natural width in pixels. The image is never scaled. */
+  /**
+   * Natural width in pixels — and the units everything else is measured in.
+   * The report never scales the image; the stage may shrink the capture to
+   * fit on screen, but that is a fact about the screen and nothing outside
+   * the overlay knows about it.
+   */
   width: number
   /** Natural height in pixels. */
   height: number

@@ -24,6 +24,10 @@ _Avoid_: box, bounding box, selection, marker, annotation
 The single artifact handed to the coding agent for one implementation capture: the annotated capture plus the note for every region on it. One report per capture, never one per divergence.
 _Avoid_: payload, handoff (collides with the `/handoff` skill), prompt, export
 
+**Stage**:
+The fixed region of the screen an implementation capture is drawn inside. Its size comes from the window, never from the capture, so an oversized capture is shrunk or scrolled rather than allowed to lay the app out.
+_Avoid_: canvas (taken — the rasterizing adapter), viewport, workspace
+
 **Coding agent**:
 The AI model that consumes reported divergences and edits the code to resolve them. The tool's only consumer.
 _Avoid_: model, AI, assistant, LLM

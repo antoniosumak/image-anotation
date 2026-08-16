@@ -30,7 +30,10 @@ export const Route = createRootRoute({
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    // Dark by default: the tool is looked at beside a design tool and a code
+    // editor, and a page of white beside either of them is the bright thing on
+    // the screen. Light is still fully defined — the class is the only switch.
+    <html lang="en" className="dark">
       <head>
         <HeadContent />
       </head>

@@ -11,8 +11,8 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
 
 /**
  * Turns a pasted or dropped file into an image the app holds — a capture or a
- * design reference — reading its natural size so the app can render it unscaled
- * and the canvas adapter can rasterize at the same size.
+ * design reference — reading its natural size, which is the unit regions are
+ * measured in and the size the canvas adapter rasterizes at.
  *
  * The returned `src` is an object URL owned by the caller — release it with
  * `releaseLoadedImage` once the image is replaced.

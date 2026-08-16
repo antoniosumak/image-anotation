@@ -17,12 +17,16 @@ export const RESIZE_HANDLES = [
 
 export type ResizeHandle = (typeof RESIZE_HANDLES)[number]
 
-/** How big a handle is drawn, and how wide a target it is to grab. */
+/**
+ * How big a handle is drawn, and how wide a target it is to grab — in screen
+ * pixels, because it is the pointer that has to hit it. A capture shrunk to
+ * fit the stage is grabbed by the same targets it would be at full size.
+ */
 export const HANDLE_SIZE = 10
 
 /**
- * How far either side of a region's outline still counts as grabbing it. The
- * drawn stroke alone is too thin to aim at.
+ * How far either side of a region's outline still counts as grabbing it, again
+ * in screen pixels. The drawn stroke alone is too thin to aim at.
  */
 export const EDGE_GRAB = 10
 
@@ -90,18 +94,27 @@ export type Grab =
  * Every handle is tried before any outline, so a region drawn over another
  * can't swallow the corner it overlaps. Within each pass the last region drawn
  * wins, because that is the one on top.
+ *
+ * `scale` is the fraction of natural size the capture is drawn at. The point
+ * and the regions are both in capture pixels, so a capture drawn at half size
+ * has to be given twice the slack in those pixels for a handle to stay the
+ * same size under the pointer.
  */
-export function grabAt(point: Point, regions: Region[]): Grab | null {
+export function grabAt(
+  point: Point,
+  regions: Region[],
+  scale = 1,
+): Grab | null {
   for (const region of [...regions].reverse()) {
     for (const handle of RESIZE_HANDLES) {
-      if (within(point, handleCenter(region.bounds, handle))) {
+      if (within(point, handleCenter(region.bounds, handle), scale)) {
         return { kind: 'resize', regionId: region.id, handle }
       }
     }
   }
 
   for (const region of [...regions].reverse()) {
-    if (onOutline(region.bounds, point)) {
+    if (onOutline(region.bounds, point, scale)) {
       return { kind: 'move', regionId: region.id }
     }
   }
@@ -115,20 +128,30 @@ export function cursorFor(grab: Grab | null): string {
   return grab.kind === 'move' ? 'move' : HANDLE_CURSOR[grab.handle]
 }
 
-function within(point: Point, center: Point): boolean {
+function within(point: Point, center: Point, scale: number): boolean {
+  const reach = inCapturePixels(HANDLE_SIZE / 2, scale)
   return (
-    Math.abs(point.x - center.x) <= HANDLE_SIZE / 2 &&
-    Math.abs(point.y - center.y) <= HANDLE_SIZE / 2
+    Math.abs(point.x - center.x) <= reach &&
+    Math.abs(point.y - center.y) <= reach
   )
 }
 
 /** On the rectangle's outline: within the grab band, either side of it. */
-function onOutline(bounds: Bounds, point: Point): boolean {
-  const band = EDGE_GRAB / 2
+function onOutline(bounds: Bounds, point: Point, scale: number): boolean {
+  const band = inCapturePixels(EDGE_GRAB / 2, scale)
   return (
     contains(grown(bounds, band), point) &&
     !contains(grown(bounds, -band), point)
   )
+}
+
+/**
+ * A distance on screen, said in capture pixels. A scale of zero or less is
+ * nonsense the stage can briefly report mid-layout; left undivided it would
+ * make every target infinite, so it is read as "drawn at natural size".
+ */
+function inCapturePixels(onScreen: number, scale: number): number {
+  return scale > 0 ? onScreen / scale : onScreen
 }
 
 /** The same rectangle, `by` further out on every side. */
