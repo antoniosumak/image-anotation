@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { createEditor, reportTextReferencing } from '#/editor/createEditor'
+import {
+  createEditor,
+  reportPromptReferencing,
+  reportTextReferencing,
+} from '#/editor/createEditor'
 import type { Capture, DesignReference } from '#/editor/types'
 
 const capture: Capture = {
@@ -936,5 +940,60 @@ describe('handing the report over as one paste', () => {
 
     expect(earlier).toContain(IMAGE_PATH)
     expect(later).not.toContain(IMAGE_PATH)
+  })
+})
+
+describe('handing the report to a session that opens holding nothing else', () => {
+  const IMAGE_PATH = '/home/dev/project/reports/report-2026-08-16T09-31-16.png'
+
+  function reportWithTwoNotedRegions() {
+    const editor = editorWithRegionsAt(10, 100)
+    const [first, second] = editor.regions()
+    editor.annotate(first!.id, 'Card padding is wrong on the right')
+    editor.annotate(second!.id, 'Submit button sits 8px too low')
+    return editor.buildReport()!
+  }
+
+  it('says where the image is, what it is, and what to do about it', () => {
+    const prompt = reportPromptReferencing(IMAGE_PATH, '')
+
+    expect(prompt).toContain(IMAGE_PATH)
+    // The three things a session with nothing else in it cannot infer.
+    expect(prompt).toContain('numbered regions')
+    expect(prompt).toContain('diverges')
+    expect(prompt).toContain('change it so the implementation matches')
+  })
+
+  it('asks rather than assumes, so a session that acts on it stays in scope', () => {
+    expect(reportPromptReferencing(IMAGE_PATH, '')).toContain(
+      'Ask me before making a change I have not asked for',
+    )
+  })
+
+  it('carries the notes as words when it is given them', () => {
+    const report = reportWithTwoNotedRegions()
+
+    expect(reportPromptReferencing(IMAGE_PATH, report.text)).toContain(
+      '1. Card padding is wrong on the right\n2. Submit button sits 8px too low',
+    )
+  })
+
+  it('still points at the image when the notes are left off', () => {
+    // What a report too long for a deep link falls back to. It has to remain a
+    // complete request on its own — the notes it drops are drawn on the image.
+    const withoutNotes = reportPromptReferencing(IMAGE_PATH, '')
+    const withNotes = reportPromptReferencing(
+      IMAGE_PATH,
+      reportWithTwoNotedRegions().text,
+    )
+
+    expect(withoutNotes).toContain(IMAGE_PATH)
+    expect(withoutNotes).toContain('note written against it on a card beside its pin')
+    expect(withNotes.startsWith(withoutNotes)).toBe(true)
+  })
+
+  it('leaves no blank gap where the notes would have been', () => {
+    expect(reportPromptReferencing(IMAGE_PATH, '')).not.toContain('\n\n\n')
+    expect(reportPromptReferencing(IMAGE_PATH, '').endsWith('\n')).toBe(false)
   })
 })

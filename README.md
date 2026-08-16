@@ -6,9 +6,35 @@ vocabulary and `docs/adr/` for the decisions behind it.
 
 The path that works today: paste or drop an implementation capture, drag a
 rectangle over each thing that is wrong, write a note against each, and click
-Copy Image to get the annotated PNG on your clipboard. Attach a design
-reference beside it — optional, and paste or drop it the same way — and the
-report carries both sides.
+**Send to Claude Code**. Attach a design reference beside it — optional, and
+paste or drop it the same way — and the report carries both sides.
+
+## Sending
+
+Send to Claude Code writes the annotated report into `reports/` and follows a
+`claude-cli://` deep link, which opens a new Claude Code session in the project
+with the prompt already typed into it. Nothing is sent until you read it and
+press Enter: the session is yours, in your terminal, under your own permission
+rules. This tool never runs a coding agent — see `docs/adr/0004`.
+
+Two things have to be true for the link to land:
+
+- **Claude Code has registered its URL handler on that machine.** It does this
+  the first time you send a prompt in an interactive session. If the button
+  appears to do nothing, that's why — start `claude`, send anything, and try
+  again.
+- **The browser and the app are on the same computer.** The image is written by
+  the server; the session opens where you clicked. Locally that's one machine,
+  which is the only way this tool is meant to be run.
+
+The other two buttons are what to reach for when neither is true. **Copy Image**
+puts the annotated PNG on your clipboard. **Write Image, Copy Text** writes the
+same image and copies a text block naming its path, so one paste carries the
+picture and the notes as words.
+
+If you run the app from somewhere other than the project you're marking up, set
+`UI_DIVERGENCE_PROJECT_DIR` to the project's absolute path. Reports are written
+inside it, and it's where the session opens.
 
 ## Running it
 
@@ -48,7 +74,9 @@ One seam and a ring of thin adapters around it.
 - **`src/adapters/`** — the only code that touches browser APIs. `canvas.ts` is
   the single thing that rasterizes a plan; `transfer.ts` picks the image out of
   a paste or a drop; `clipboard.ts` writes the annotated PNG back; `image.ts`
-  decodes an image's natural size.
+  decodes an image's natural size; `deep-link.ts` follows the URL that opens
+  Claude Code. `filesystem.ts` is the one server function — a browser page
+  can't write to a local path, and a path is the whole point.
 - **`src/components/capture-editor.tsx`** — translates pointer events into
   intents and draws what the core reports. It holds no region state of its own,
   and owns the object URL behind the design reference the core names. It also

@@ -6,6 +6,7 @@ import {
   Copy,
   Maximize2,
   Minimize2,
+  Send,
   TriangleAlert,
   Trash2,
 } from 'lucide-react'
@@ -13,6 +14,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 
 import { rasterizeReport } from '#/adapters/canvas'
 import { copyImageToClipboard, copyTextToClipboard } from '#/adapters/clipboard'
+import { followDeepLink } from '#/adapters/deep-link'
 import { writeReportImage } from '#/adapters/filesystem'
 import { loadImageFile, releaseLoadedImage } from '#/adapters/image'
 import { DesignReferencePanel } from '#/components/design-reference-panel'
@@ -27,7 +29,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '#/components/ui/alert-dialog'
-import { createEditor, reportTextReferencing } from '#/editor/createEditor'
+import {
+  createEditor,
+  reportPromptReferencing,
+  reportTextReferencing,
+} from '#/editor/createEditor'
 import type {
   Bounds,
   Capture,
@@ -36,6 +42,7 @@ import type {
   Region,
 } from '#/editor/types'
 import { type Size, fitScale, scaledSize } from '#/lib/capture-fit'
+import { PROMPT_LIMIT, claudeCodeLink } from '#/lib/claude-deep-link'
 import {
   HANDLE_SIZE,
   RESIZE_HANDLES,
@@ -87,6 +94,14 @@ type WriteState =
   | 'empty'
 
 /**
+ * How handing the report straight to Claude Code went. `sent` is as far as
+ * this can honestly go: following a `claude-cli://` link is handing the URL to
+ * the operating system, which tells the page nothing about what it did with
+ * it — so the label says the report was sent, never that a session opened.
+ */
+type SendState = 'idle' | 'sending' | 'sent' | 'failed' | 'empty'
+
+/**
  * The drag under way, as pointer bookkeeping — which region is being edited
  * and where the drag started, so escaping out of it can put things back. What
  * the drag *means* for the regions is the editor core's business.
@@ -124,6 +139,30 @@ const WRITE_LABEL: Record<WriteState, string> = {
   empty: NOTHING_TO_SEND,
 }
 
+const SEND_LABEL: Record<SendState, string> = {
+  idle: 'Send to Claude Code',
+  sending: 'Sending…',
+  sent: 'Sent',
+  failed: 'Send failed — try again',
+  empty: NOTHING_TO_SEND,
+}
+
+/**
+ * What the status bar says about the last image written, which is the one
+ * place a report that has been handed over is still visible.
+ *
+ * A send stops at the prompt being typed into a terminal, and the button can
+ * only say so much — a developer who doesn't know that is one waiting on a
+ * session that is already waiting on them.
+ */
+function writtenPrefix(writeState: WriteState, sendState: SendState): string {
+  if (sendState === 'sent') {
+    return 'Waiting in Claude Code — press Enter there to send it. Image written to'
+  }
+  if (writeState === 'uncopied') return 'Text not copied. Image written to'
+  return 'Image written to'
+}
+
 /**
  * Drives the editor core from pointer events and draws what it reports. It
  * holds no state of its own beyond how things are being *looked* at: every
@@ -140,6 +179,7 @@ export function CaptureEditor({
   const [editor] = useState(() => createEditor(capture))
   const [copyState, setCopyState] = useState<CopyState>('idle')
   const [writeState, setWriteState] = useState<WriteState>('idle')
+  const [sendState, setSendState] = useState<SendState>('idle')
   // Where the last image written went. Kept however the capture is marked up
   // afterwards, because the file is still there and a text block already pasted
   // into a coding agent still names it.
@@ -153,12 +193,13 @@ export function CaptureEditor({
   const scale = zoom === 'actual' ? 1 : fits
   const drawn = scaledSize(capture, scale)
 
-  // What was copied described the regions as they stood — once they change,
-  // saying it was copied would be saying it about a report that no longer
-  // exists.
-  const forgetWhatWasCopied = () => {
+  // What was handed over described the regions as they stood — once they
+  // change, saying it was copied or sent would be saying it about a report
+  // that no longer exists.
+  const forgetWhatWasHandedOver = () => {
     setCopyState('idle')
     setWriteState('idle')
+    setSendState('idle')
   }
 
   const { regions, draft, designReference } = useSyncExternalStore(
@@ -174,7 +215,7 @@ export function CaptureEditor({
     const previous = editor.designReference()
     if (next) editor.attachDesignReference(next)
     else editor.removeDesignReference()
-    forgetWhatWasCopied()
+    forgetWhatWasHandedOver()
     if (previous) releaseLoadedImage(previous)
   }
 
@@ -328,15 +369,73 @@ export function CaptureEditor({
     }
   }
 
+  /**
+   * Hands the report straight to the developer's own Claude Code: the image
+   * written inside the project, and a `claude-cli://` link followed so a new
+   * session opens there with the prompt naming it already typed in.
+   *
+   * It stops at typed. The developer reads what is about to be sent and presses
+   * Enter themselves, in their own terminal under their own permission rules —
+   * the tool never runs a coding agent. See ADR-0004.
+   */
+  const sendToClaudeCode = async () => {
+    // Built once and up front, for the same reasons as the button beside it:
+    // the image sent and the prompt describing it are one report, and an
+    // unmarked capture is turned away before a file is written for it.
+    const report = editor.buildReport()
+    if (!report) {
+      setSendState('empty')
+      return
+    }
+
+    setSendState('sending')
+    try {
+      const png = await rasterizeReport(report.plan)
+
+      const body = new FormData()
+      body.set('image', png, 'report.png')
+      const { path, projectDirectory } = await writeReportImage({ data: body })
+      setWritten(path)
+
+      // Past the link's limit the notes are left off rather than cut short.
+      // Nothing is lost by that: every note is drawn on a card beside its pin
+      // on the image the prompt points at, so the report still says what is
+      // wrong — the agent reads it off the picture instead of the prompt.
+      const withNotes = reportPromptReferencing(path, report.text)
+      const prompt =
+        withNotes.length <= PROMPT_LIMIT
+          ? withNotes
+          : reportPromptReferencing(path, '')
+
+      followDeepLink(claudeCodeLink({ prompt, directory: projectDirectory }))
+      setSendState('sent')
+    } catch {
+      setSendState('failed')
+    }
+  }
+
   return (
     <main className="flex min-h-0 flex-1">
       <section className="flex min-w-0 flex-1 flex-col">
-        {/* Both ways of handing a report over stay pressable with nothing
+        {/* Every way of handing a report over stays pressable with nothing
             marked up. A developer who presses one is told there is nothing to
             send, which says more than a button that quietly cannot be
-            pressed. */}
+            pressed.
+
+            Sending leads because it is the whole errand in one press. The two
+            beside it are what to reach for when it can't be: Claude Code
+            somewhere other than this machine, or its link handler not
+            registered — see ADR-0004. */}
         <div className="border-border/80 flex h-12 shrink-0 items-center gap-2 border-b px-4">
-          <Button size="sm" onClick={copyImage}>
+          <Button
+            size="sm"
+            onClick={sendToClaudeCode}
+            disabled={sendState === 'sending'}
+          >
+            <StateIcon state={sendState} idle={<Send />} />
+            {SEND_LABEL[sendState]}
+          </Button>
+          <Button size="sm" variant="outline" onClick={copyImage}>
             <StateIcon state={copyState} idle={<Copy />} />
             {COPY_LABEL[copyState]}
           </Button>
@@ -395,7 +494,7 @@ export function CaptureEditor({
             }}
             onPointerDown={(event) => {
               event.currentTarget.setPointerCapture(event.pointerId)
-              forgetWhatWasCopied()
+              forgetWhatWasHandedOver()
               beginGesture(pointOn(event))
             }}
             onPointerMove={(event) => continueGesture(pointOn(event))}
@@ -441,9 +540,7 @@ export function CaptureEditor({
                 <TriangleAlert className="text-destructive size-3.5 shrink-0" />
               ) : null}
               <span className="shrink-0">
-                {writeState === 'uncopied'
-                  ? 'Text not copied. Image written to'
-                  : 'Image written to'}
+                {writtenPrefix(writeState, sendState)}
               </span>
               <code className="text-foreground truncate font-mono" title={written}>
                 {written}
@@ -465,14 +562,15 @@ export function CaptureEditor({
         <NotePanel
           regions={regions}
           onNoteChange={(regionId, note) => {
-            // The copied text block *is* the notes, so a keystroke after
-            // copying makes it stale. Copy Image is left saying exactly what it
-            // said before this button existed.
+            // The copied text block and the sent prompt *are* the notes, so a
+            // keystroke after either makes it stale. Copy Image is left saying
+            // exactly what it said before these buttons existed.
             setWriteState('idle')
+            setSendState('idle')
             editor.annotate(regionId, note)
           }}
           onDelete={(regionId) => {
-            forgetWhatWasCopied()
+            forgetWhatWasHandedOver()
             editor.removeRegion(regionId)
           }}
         />
@@ -512,10 +610,10 @@ function StateIcon({
   state,
   idle,
 }: {
-  state: CopyState
+  state: CopyState | SendState
   idle: React.ReactNode
 }) {
-  if (state === 'copied') return <Check />
+  if (state === 'copied' || state === 'sent') return <Check />
   if (state === 'failed' || state === 'empty') return <TriangleAlert />
   return idle
 }

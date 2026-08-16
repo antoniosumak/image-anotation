@@ -4,10 +4,15 @@ import { join, resolve } from 'node:path'
 import { createServerFn } from '@tanstack/react-start'
 
 /**
- * Where written reports land, relative to where the app was started. A
- * directory of its own, so a session's worth of reports is one place to clear.
+ * Where written reports land, inside the project they are about. A directory
+ * of its own, so a session's worth of reports is one place to clear.
  */
 const REPORTS_DIRECTORY = 'reports'
+
+/**
+ * Where to look for the project when the app is not being run from inside it.
+ */
+const PROJECT_DIRECTORY_VARIABLE = 'UI_DIVERGENCE_PROJECT_DIR'
 
 /**
  * How many names are tried before giving up. Two reports written in the same
@@ -31,9 +36,13 @@ export const writeReportImage = createServerFn({ method: 'POST' })
       throw new Error('No report image was sent to write')
     }
 
-    // Absolute, because the coding agent reading the text block is not
-    // necessarily working from the directory the app was started in.
-    const directory = resolve(process.cwd(), REPORTS_DIRECTORY)
+    // Inside the project, and absolute. Inside, because a coding agent working
+    // in that project can read a file under it without being asked for
+    // permission to reach outside its own directory — and a report it cannot
+    // open is a report that was never handed over. Absolute, because the text
+    // block naming it is read somewhere that may be working from anywhere.
+    const project = projectDirectory()
+    const directory = resolve(project, REPORTS_DIRECTORY)
     await mkdir(directory, { recursive: true })
 
     const path = await writeWithoutOverwriting(
@@ -41,8 +50,21 @@ export const writeReportImage = createServerFn({ method: 'POST' })
       await image.arrayBuffer(),
     )
 
-    return { path }
+    return { path, projectDirectory: project }
   })
+
+/**
+ * The project a report is about: where its image is written, and where a
+ * session opened from it starts.
+ *
+ * Where the app was started, unless told otherwise — run the tool from the
+ * project you are marking up and that is already right. The environment
+ * variable is for when it isn't: the tool running from its own checkout while
+ * the code with the divergence in it is somewhere else.
+ */
+function projectDirectory(): string {
+  return resolve(process.env[PROJECT_DIRECTORY_VARIABLE] || process.cwd())
+}
 
 /**
  * Writes the image under a name nothing else is using. Every report written

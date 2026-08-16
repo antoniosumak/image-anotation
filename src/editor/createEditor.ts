@@ -128,6 +128,35 @@ export function reportTextReferencing(report: Report, imagePath: string): string
     .join('\n\n')
 }
 
+/**
+ * The same report as an instruction rather than a description, for a session
+ * that opens with the report as the only thing in it.
+ *
+ * `reportTextReferencing` is pasted by the developer into a conversation that
+ * is already about something, so it only has to name the image and list the
+ * notes. A session opened from a link has no such context: the prompt has to
+ * say what the picture is and what is being asked for, or the report arrives
+ * as a screenshot with red rectangles on it and no request attached.
+ */
+export function reportPromptReferencing(
+  imagePath: string,
+  /**
+   * The report's own text block, or empty to leave the notes off — which loses
+   * nothing, because every note is drawn on a card beside its pin on the image
+   * itself. Worth doing when the notes are too long for wherever the prompt is
+   * being carried.
+   */
+  notes: string,
+): string {
+  return [
+    `Read the report image at ${imagePath}. It is a capture of this project's UI as currently built, with numbered regions drawn on it — each one marks somewhere the implementation diverges from its intended design, and carries the note written against it on a card beside its pin.`,
+    'Work out which code produces each numbered region and change it so the implementation matches. Ask me before making a change I have not asked for.',
+    notes,
+  ]
+    .filter(Boolean)
+    .join('\n\n')
+}
+
 function boundsBetween(from: Point, to: Point): Bounds {
   return {
     x: Math.min(from.x, to.x),

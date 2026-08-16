@@ -32,6 +32,14 @@ _Avoid_: tooltip, popover, bubble, balloon
 The single artifact handed to the coding agent for one implementation capture: the annotated capture plus the note for every region on it. One report per capture, never one per divergence.
 _Avoid_: payload, handoff (collides with the `/handoff` skill), prompt, export
 
+**Send**:
+Handing a report to the developer's own Claude Code by following a `claude-cli://` deep link: a new terminal session opens in the project with the prompt already typed in, waiting on Enter. The tool never runs a coding agent itself — see ADR-0004.
+_Avoid_: run, execute, launch, invoke, trigger (all of them claim the tool does the work)
+
+**Prompt**:
+The report as a request rather than a description — what the image is, what is being asked for, and the notes. What a sent report carries, as distinct from the text block a developer pastes themselves.
+_Avoid_: message, query, instruction set, command
+
 **Stage**:
 The fixed region of the screen an implementation capture is drawn inside. Its size comes from the window, never from the capture, so an oversized capture is shrunk or scrolled rather than allowed to lay the app out.
 _Avoid_: canvas (taken — the rasterizing adapter), viewport, workspace
