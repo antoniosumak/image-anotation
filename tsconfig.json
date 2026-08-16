@@ -8,7 +8,9 @@
       "#/*": ["./src/*"]
     },
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["vite/client"],
+    // `node` for the server function, which is the one thing here that touches
+    // the filesystem — see `src/adapters/filesystem.ts`.
+    "types": ["vite/client", "node"],
 
     /* Bundler mode */
     "moduleResolution": "bundler",

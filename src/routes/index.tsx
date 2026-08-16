@@ -99,7 +99,8 @@ function Home() {
         </h1>
         <p className="text-muted-foreground">
           Paste an implementation capture, drag a rectangle over what is wrong,
-          and copy the annotated image for your coding agent.
+          and hand the annotated report to your coding agent — as an image on
+          your clipboard, or as a written image and the text block naming it.
         </p>
       </header>
 

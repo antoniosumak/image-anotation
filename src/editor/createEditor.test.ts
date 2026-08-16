@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { createEditor } from '#/editor/createEditor'
+import { createEditor, reportTextReferencing } from '#/editor/createEditor'
 import type { Capture, DesignReference } from '#/editor/types'
 
 const capture: Capture = {
@@ -840,5 +840,75 @@ describe('building a report with a design reference', () => {
     const editor = editorWithBothSides()
 
     expect(editor.buildReport()).toEqual(editor.buildReport())
+  })
+})
+
+describe('handing the report over as one paste', () => {
+  const IMAGE_PATH = '/home/dev/project/reports/report-2026-08-16T09-31-16.png'
+
+  /** Two regions, both written against, on a capture with no design reference. */
+  function editorWithTwoNotedRegions() {
+    const editor = editorWithRegionsAt(10, 100)
+    const [first, second] = editor.regions()
+    editor.annotate(first!.id, 'Card padding is wrong on the right')
+    editor.annotate(second!.id, 'Submit button sits 8px too low')
+    return editor
+  }
+
+  it('says where the annotated image was written, then lists every region', () => {
+    const report = editorWithTwoNotedRegions().buildReport()
+
+    expect(reportTextReferencing(report, IMAGE_PATH)).toBe(
+      `The report image is at ${IMAGE_PATH}.\n\n` +
+        '1. Card padding is wrong on the right\n' +
+        '2. Submit button sits 8px too low',
+    )
+  })
+
+  it('carries the report text it was given rather than listing the regions again', () => {
+    const report = editorWithTwoNotedRegions().buildReport()
+
+    expect(reportTextReferencing(report, IMAGE_PATH)).toContain(report.text)
+  })
+
+  it('still lists a region nothing was written against', () => {
+    const report = editorWithRegionsAt(10).buildReport()
+
+    expect(reportTextReferencing(report, IMAGE_PATH)).toBe(
+      `The report image is at ${IMAGE_PATH}.\n\n1. (no note)`,
+    )
+  })
+
+  it('keeps which side is which when a design reference is attached', () => {
+    const editor = editorWithRegionsAt(10)
+    editor.annotate(editor.regions()[0]!.id, 'Card padding is wrong')
+    editor.attachDesignReference(designReference)
+
+    expect(reportTextReferencing(editor.buildReport(), IMAGE_PATH)).toBe(
+      `The report image is at ${IMAGE_PATH}.\n\n` +
+        'The implementation capture is on the left, and the design reference it should match is on the right. The numbered regions mark divergences on the implementation capture.\n\n' +
+        '1. Card padding is wrong',
+    )
+  })
+
+  it('says only where the image is when nothing was marked up', () => {
+    const report = createEditor(capture).buildReport()
+
+    expect(reportTextReferencing(report, IMAGE_PATH)).toBe(
+      `The report image is at ${IMAGE_PATH}.`,
+    )
+  })
+
+  it('names a different image each time one is written, leaving earlier text blocks pointing at their own', () => {
+    const report = editorWithTwoNotedRegions().buildReport()
+    const earlier = reportTextReferencing(report, IMAGE_PATH)
+
+    const later = reportTextReferencing(
+      report,
+      '/home/dev/project/reports/report-2026-08-16T09-34-02.png',
+    )
+
+    expect(earlier).toContain(IMAGE_PATH)
+    expect(later).not.toContain(IMAGE_PATH)
   })
 })

@@ -2,12 +2,13 @@ import { Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 
 import { rasterizeReport } from '#/adapters/canvas'
-import { copyImageToClipboard } from '#/adapters/clipboard'
+import { copyImageToClipboard, copyTextToClipboard } from '#/adapters/clipboard'
+import { writeReportImage } from '#/adapters/filesystem'
 import { loadImageFile, releaseLoadedImage } from '#/adapters/image'
 import { DesignReferencePanel } from '#/components/design-reference-panel'
 import { Button } from '#/components/ui/button'
 import { Textarea } from '#/components/ui/textarea'
-import { createEditor } from '#/editor/createEditor'
+import { createEditor, reportTextReferencing } from '#/editor/createEditor'
 import type {
   Bounds,
   Capture,
@@ -38,6 +39,14 @@ import { cn } from '#/lib/utils'
 type CopyState = 'idle' | 'copying' | 'copied' | 'failed'
 
 /**
+ * How the other way of handing a report over went. The image landing on disk
+ * and the text block landing on the clipboard are two things that can fail
+ * separately, and saying "text copied" when the clipboard refused it would
+ * send the developer off to paste nothing.
+ */
+type WriteState = 'idle' | 'writing' | 'copied' | 'uncopied' | 'failed'
+
+/**
  * The drag under way, as pointer bookkeeping — which region is being edited
  * and where the drag started, so escaping out of it can put things back. What
  * the drag *means* for the regions is the editor core's business.
@@ -54,6 +63,14 @@ const COPY_LABEL: Record<CopyState, string> = {
   failed: 'Copy failed — try again',
 }
 
+const WRITE_LABEL: Record<WriteState, string> = {
+  idle: 'Write Image, Copy Text',
+  writing: 'Writing…',
+  copied: 'Text copied',
+  uncopied: 'Text not copied — try again',
+  failed: 'Write failed — try again',
+}
+
 /**
  * Drives the editor core from pointer events and draws what it reports. It
  * holds no state of its own: every rectangle on screen came out of the core.
@@ -61,8 +78,21 @@ const COPY_LABEL: Record<CopyState, string> = {
 export function CaptureEditor({ capture }: { capture: Capture }) {
   const [editor] = useState(() => createEditor(capture))
   const [copyState, setCopyState] = useState<CopyState>('idle')
+  const [writeState, setWriteState] = useState<WriteState>('idle')
+  // Where the last image written went. Kept however the capture is marked up
+  // afterwards, because the file is still there and a text block already pasted
+  // into a coding agent still names it.
+  const [written, setWritten] = useState<string | null>(null)
   const [cursor, setCursor] = useState('crosshair')
   const gesture = useRef<Gesture | null>(null)
+
+  // What was copied described the regions as they stood — once they change,
+  // saying it was copied would be saying it about a report that no longer
+  // exists.
+  const forgetWhatWasCopied = () => {
+    setCopyState('idle')
+    setWriteState('idle')
+  }
 
   const { regions, draft, designReference } = useSyncExternalStore(
     editor.subscribe,
@@ -77,7 +107,7 @@ export function CaptureEditor({ capture }: { capture: Capture }) {
     const previous = editor.designReference()
     if (next) editor.attachDesignReference(next)
     else editor.removeDesignReference()
-    setCopyState('idle')
+    forgetWhatWasCopied()
     if (previous) releaseLoadedImage(previous)
   }
 
@@ -176,17 +206,69 @@ export function CaptureEditor({ capture }: { capture: Capture }) {
     }
   }
 
+  /**
+   * The other way of handing a report over: the same report, written to disk as
+   * an image and copied to the clipboard as the text block naming it — so one
+   * paste gives the coding agent the picture and the notes as words at once.
+   */
+  const writeImageAndCopyText = async () => {
+    setWriteState('writing')
+    try {
+      // Built once, so the image written and the text copied describe the same
+      // regions rather than two reads of the editor a moment apart.
+      const report = editor.buildReport()
+      const png = await rasterizeReport(report.plan)
+
+      const body = new FormData()
+      body.set('image', png, 'report.png')
+      const { path } = await writeReportImage({ data: body })
+      setWritten(path)
+
+      try {
+        await copyTextToClipboard(reportTextReferencing(report, path))
+        setWriteState('copied')
+      } catch {
+        // The image is on disk whatever the clipboard did, and a developer who
+        // knows where it went can still hand it over.
+        setWriteState('uncopied')
+      }
+    } catch {
+      setWriteState('failed')
+    }
+  }
+
   return (
     <div className="flex flex-col items-start gap-4">
-      <div className="flex items-center gap-3">
-        <Button onClick={copyImage} disabled={regions.length === 0}>
-          {COPY_LABEL[copyState]}
-        </Button>
-        <p className="text-muted-foreground text-sm">
-          {regions.length === 0
-            ? 'Drag a rectangle over what is wrong. Escape abandons a drag.'
-            : 'Drag another rectangle for each divergence, and say what is wrong beside it. Drag a region by its outline to move it, or by a handle to resize it.'}
-        </p>
+      <div className="flex flex-col items-start gap-2">
+        <div className="flex items-center gap-3">
+          <Button onClick={copyImage} disabled={regions.length === 0}>
+            {COPY_LABEL[copyState]}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={writeImageAndCopyText}
+            disabled={writeState === 'writing' || regions.length === 0}
+          >
+            {WRITE_LABEL[writeState]}
+          </Button>
+          <p className="text-muted-foreground text-sm">
+            {regions.length === 0
+              ? 'Drag a rectangle over what is wrong. Escape abandons a drag.'
+              : 'Drag another rectangle for each divergence, and say what is wrong beside it. Drag a region by its outline to move it, or by a handle to resize it.'}
+          </p>
+        </div>
+
+        {/* Where the image went, so the developer can find it — and so the path
+            in the copied text block can be recognised as theirs. It says only
+            what stays true, so it can be left up while the marking-up goes on. */}
+        {written ? (
+          <p className="text-muted-foreground text-sm">
+            {writeState === 'uncopied'
+              ? 'The text block could not be copied. Image written to '
+              : 'Image written to '}
+            <code className="font-mono">{written}</code>
+          </p>
+        ) : null}
       </div>
 
       <div className="flex items-start gap-6">
@@ -199,7 +281,7 @@ export function CaptureEditor({ capture }: { capture: Capture }) {
           style={{ width: capture.width, height: capture.height, cursor }}
           onPointerDown={(event) => {
             event.currentTarget.setPointerCapture(event.pointerId)
-            setCopyState('idle')
+            forgetWhatWasCopied()
             beginGesture(pointOn(event))
           }}
           onPointerMove={(event) => continueGesture(pointOn(event))}
@@ -228,9 +310,15 @@ export function CaptureEditor({ capture }: { capture: Capture }) {
 
         <NotePanel
           regions={regions}
-          onNoteChange={(regionId, note) => editor.annotate(regionId, note)}
+          onNoteChange={(regionId, note) => {
+            // The copied text block *is* the notes, so a keystroke after
+            // copying makes it stale. Copy Image is left saying exactly what it
+            // said before this button existed.
+            setWriteState('idle')
+            editor.annotate(regionId, note)
+          }}
           onDelete={(regionId) => {
-            setCopyState('idle')
+            forgetWhatWasCopied()
             editor.removeRegion(regionId)
           }}
         />

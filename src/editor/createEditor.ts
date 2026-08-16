@@ -114,6 +114,20 @@ function layOutSides(
   }
 }
 
+/**
+ * The report as the one thing a developer pastes into a coding agent: where its
+ * image was written, then the report's own text block unchanged.
+ *
+ * The path is only known once the image has been written, so it arrives here
+ * rather than in `buildReport` — one report is built, and the words it carries
+ * are the same whether it is handed over as pixels or as this.
+ */
+export function reportTextReferencing(report: Report, imagePath: string): string {
+  return [`The report image is at ${imagePath}.`, report.text]
+    .filter(Boolean)
+    .join('\n\n')
+}
+
 function boundsBetween(from: Point, to: Point): Bounds {
   return {
     x: Math.min(from.x, to.x),
