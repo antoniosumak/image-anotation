@@ -29,14 +29,19 @@ export const HANDLE_BORDER = '#ffffff'
  */
 export type PinTip = 'bottom-left' | 'top-left'
 
-export const PIN_SIZE = 28
+export const PIN_SIZE = 32
 /** Full round, so the three unpointed corners make a disc rather than a box. */
 export const PIN_RADIUS = PIN_SIZE / 2
 
 export const PIN_BACKGROUND = REGION_STROKE
 export const PIN_TEXT_COLOR = '#ffffff'
-export const PIN_FONT_SIZE = 13
-export const PIN_FONT = `600 ${PIN_FONT_SIZE}px ui-sans-serif, system-ui, sans-serif`
+export const PIN_FONT_SIZE = 15
+/**
+ * Heavier than the note it points at. The number is the whole join between the
+ * image and the text block beside it — a "3" that resamples into an "8" is a
+ * coding agent fixing the wrong thing.
+ */
+export const PIN_FONT = `700 ${PIN_FONT_SIZE}px ui-sans-serif, system-ui, sans-serif`
 
 /**
  * The white collar around the pin, and the shadow under it. Both are doing the
@@ -61,14 +66,30 @@ export const CARD_BACKGROUND = '#ffffff'
 export const CARD_TEXT_COLOR = '#0f172a'
 export const CARD_BORDER = 'rgba(15, 23, 42, 0.12)'
 export const CARD_BORDER_WIDTH = 1
-export const CARD_FONT_SIZE = 13
-export const CARD_LINE_HEIGHT = 18
-export const CARD_FONT = `400 ${CARD_FONT_SIZE}px ui-sans-serif, system-ui, sans-serif`
-export const CARD_PADDING_X = 10
-export const CARD_PADDING_Y = 8
-export const CARD_RADIUS = 10
-/** Long notes wrap rather than running off the side of the capture. */
-export const CARD_MAX_WIDTH = 320
+
+/**
+ * Larger and heavier than UI text of the same rank would be, and deliberately
+ * so. A report is drawn at the capture's own pixels — two sides of a 1280-wide
+ * screen make an image over 2500 wide — and a coding agent's vision pipeline
+ * resizes an image that big down before reading it. Text set at the size the
+ * surrounding UI uses arrives at roughly two thirds of it, which is the
+ * difference between a note being read and being guessed at.
+ *
+ * The weight matters as much as the size: a heavier stroke survives being
+ * resampled where a hairline one breaks up.
+ */
+export const CARD_FONT_SIZE = 16
+export const CARD_LINE_HEIGHT = 22
+export const CARD_FONT = `500 ${CARD_FONT_SIZE}px ui-sans-serif, system-ui, sans-serif`
+export const CARD_PADDING_X = 14
+export const CARD_PADDING_Y = 11
+export const CARD_RADIUS = 12
+/**
+ * Long notes wrap rather than running off the side of the capture. Wider than
+ * it was when the type was smaller, so a note that used to run to two lines
+ * still does rather than becoming a tall stack covering more of the capture.
+ */
+export const CARD_MAX_WIDTH = 400
 /** How far the card is held off the pin it belongs to. */
 export const CARD_GAP = 6
 

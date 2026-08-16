@@ -37,8 +37,9 @@ describe('pinCornerRadii', () => {
   })
 
   it('writes the same corners for CSS as for the canvas', () => {
-    expect(pinBorderRadius('bottom-left')).toBe('14px 14px 14px 0px')
-    expect(pinBorderRadius('top-left')).toBe('0px 14px 14px 14px')
+    const r = `${PIN_RADIUS}px`
+    expect(pinBorderRadius('bottom-left')).toBe(`${r} ${r} ${r} 0px`)
+    expect(pinBorderRadius('top-left')).toBe(`0px ${r} ${r} ${r}`)
   })
 })
 
