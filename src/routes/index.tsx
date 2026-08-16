@@ -40,6 +40,13 @@ function Home() {
   const [captureError, setCaptureError] = useState<string | null>(null)
   const previous = useRef<Capture | null>(null)
 
+  // The object URL behind the capture on screen is this component's to release,
+  // and there are three ways it stops being the one on screen: replaced by
+  // another, cleared, or the page going away.
+  const releasePreviousCapture = () => {
+    if (previous.current) releaseLoadedImage(previous.current)
+  }
+
   // Both ways an image arrives end here: a paste and a drop carry the same
   // thing, and either one replaces the capture.
   const takeCapture = async (transfer: DataTransfer | null) => {
@@ -50,7 +57,7 @@ function Home() {
     }
     try {
       const next = await loadImageFile(image)
-      if (previous.current) releaseLoadedImage(previous.current)
+      releasePreviousCapture()
       previous.current = next
       setCaptureError(null)
       setCapture(next)
@@ -66,7 +73,7 @@ function Home() {
    * none of them are written down anywhere else.
    */
   const clearCapture = () => {
-    if (previous.current) releaseLoadedImage(previous.current)
+    releasePreviousCapture()
     previous.current = null
     setCaptureError(null)
     setCapture(null)
@@ -84,9 +91,7 @@ function Home() {
   }, [])
 
   // Only on unmount — taking a capture releases the one it replaces.
-  useEffect(() => () => {
-    if (previous.current) releaseLoadedImage(previous.current)
-  }, [])
+  useEffect(() => () => releasePreviousCapture(), [])
 
   return (
     // A file dropped anywhere but the design reference is a capture — the page

@@ -288,9 +288,10 @@ export function CaptureEditor({
   return (
     <div className="flex flex-col items-start gap-4">
       <div className="flex flex-col items-start gap-2">
-        {/* Both export buttons stay pressable with nothing marked up. A
-            developer who presses one is told there is nothing to send, which
-            says more than a button that quietly cannot be pressed. */}
+        {/* Both ways of handing a report over stay pressable with nothing
+            marked up. A developer who presses one is told there is nothing to
+            send, which says more than a button that quietly cannot be
+            pressed. */}
         <div className="flex items-center gap-3">
           <Button onClick={copyImage}>{COPY_LABEL[copyState]}</Button>
           <Button

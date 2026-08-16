@@ -357,8 +357,8 @@ export function createEditor(capture: Capture) {
      * guessing at what it was being shown.
      */
     buildReport(): Report | null {
-      const { designReference } = state
       if (state.regions.length === 0) return null
+      const { designReference } = state
       return {
         plan: {
           ...layOutSides(capture, designReference),

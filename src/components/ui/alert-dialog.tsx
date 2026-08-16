@@ -3,11 +3,10 @@ import { AlertDialog as AlertDialogPrimitive } from '@base-ui/react/alert-dialog
 import { buttonVariants } from '#/components/ui/button'
 import { cn } from '#/lib/utils'
 
-function AlertDialog({
-  ...props
-}: React.ComponentProps<typeof AlertDialogPrimitive.Root>) {
-  return <AlertDialogPrimitive.Root {...props} />
-}
+// Aliased rather than wrapped: the root renders no element of its own — it is
+// just the open/closed state shared with the parts below — so there is nothing
+// for a wrapper to style or stamp a `data-slot` on.
+const AlertDialog = AlertDialogPrimitive.Root
 
 function AlertDialogTrigger({
   ...props
@@ -15,6 +14,7 @@ function AlertDialogTrigger({
   return <AlertDialogPrimitive.Trigger data-slot="alert-dialog-trigger" {...props} />
 }
 
+/** Drawn only as part of `AlertDialogContent`, which is the whole dialog. */
 function AlertDialogBackdrop({
   className,
   ...props
@@ -32,9 +32,10 @@ function AlertDialogBackdrop({
 }
 
 /**
- * The dialog itself. Nothing dismisses an alert dialog but its own buttons —
- * no click outside, no Escape — because it is only ever asked when the answer
- * matters, and a stray click is not an answer.
+ * The dialog itself. A click outside does not dismiss an alert dialog, because
+ * it is only ever asked when the answer matters and a stray click is not an
+ * answer. Escape still does, and answers it the safe way — the same as the
+ * cancel button, never the action.
  */
 function AlertDialogContent({
   className,
@@ -123,7 +124,6 @@ function AlertDialogAction({
 export {
   AlertDialog,
   AlertDialogAction,
-  AlertDialogBackdrop,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
