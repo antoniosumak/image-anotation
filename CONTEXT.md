@@ -20,6 +20,10 @@ _Avoid_: bug, diff, error, issue, defect
 The rectangle drawn on an implementation capture that locates a divergence. Always a rectangle, because UI elements are rectangles.
 _Avoid_: box, bounding box, selection, marker, annotation
 
+**Report**:
+The single artifact handed to the coding agent for one implementation capture: the annotated capture plus the note for every region on it. One report per capture, never one per divergence.
+_Avoid_: payload, handoff (collides with the `/handoff` skill), prompt, export
+
 **Coding agent**:
 The AI model that consumes reported divergences and edits the code to resolve them. The tool's only consumer.
 _Avoid_: model, AI, assistant, LLM
