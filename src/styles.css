@@ -92,6 +92,34 @@
   border-color: var(--plerivo-color-semantic-ring);
 }
 
+/*
+ * Send to Claude Code wears Claude's own orange rather than the design
+ * system's primary. The button is the one control that hands work to something
+ * outside this app, and carrying that thing's colour and mark is what says so
+ * before the label has been read.
+ *
+ * Unlayered, like `.drop-target` above and for the same reason: the button's
+ * `bg-primary` and `hover:bg-primary/90` are Tailwind utilities living in
+ * `@layer utilities`, and unlayered CSS outranks anything layered however
+ * specific it is — so these land without reaching for `!important`.
+ *
+ * The same orange in both themes. It is a brand colour, not a palette entry,
+ * and it holds up on either ground.
+ */
+.send-to-claude {
+  --claude-orange: #d97757;
+  /* `focus-visible:ring-ring/50` mixes its ring from this, so the focus ring
+     comes out orange too rather than reverting to the app's accent. */
+  --color-ring: var(--claude-orange);
+
+  background-color: var(--claude-orange);
+  color: #fff;
+}
+
+.send-to-claude:hover:not(:disabled) {
+  background-color: #c96442;
+}
+
 /* Scrollbars inside the rail and the stage, kept out of the way. */
 .scrollbar-slim {
   scrollbar-width: thin;

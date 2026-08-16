@@ -6,7 +6,6 @@ import {
   Copy,
   Maximize2,
   Minimize2,
-  Send,
   TriangleAlert,
   Trash2,
 } from 'lucide-react'
@@ -17,6 +16,7 @@ import { copyImageToClipboard, copyTextToClipboard } from '#/adapters/clipboard'
 import { followDeepLink } from '#/adapters/deep-link'
 import { writeReportImage } from '#/adapters/filesystem'
 import { loadImageFile, releaseLoadedImage } from '#/adapters/image'
+import { ClaudeMark } from '#/components/claude-mark'
 import { DesignReferencePanel } from '#/components/design-reference-panel'
 import { PanelHeading } from '#/components/panel-heading'
 import {
@@ -429,10 +429,11 @@ export function CaptureEditor({
         <div className="border-border/80 flex h-12 shrink-0 items-center gap-2 border-b px-4">
           <Button
             size="sm"
+            className="send-to-claude"
             onClick={sendToClaudeCode}
             disabled={sendState === 'sending'}
           >
-            <StateIcon state={sendState} idle={<Send />} />
+            <StateIcon state={sendState} idle={<ClaudeMark />} />
             {SEND_LABEL[sendState]}
           </Button>
           <Button size="sm" variant="outline" onClick={copyImage}>
