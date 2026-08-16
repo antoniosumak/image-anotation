@@ -136,6 +136,25 @@ describe('drawing a region', () => {
     })
   })
 
+  it('does not spend a number on a cancelled drag', () => {
+    const editor = createEditor(capture)
+
+    editor.beginRegion({ x: 10, y: 10 })
+    editor.updateRegion({ x: 50, y: 50 })
+    editor.commitRegion()
+
+    editor.beginRegion({ x: 100, y: 100 })
+    editor.updateRegion({ x: 140, y: 140 })
+    editor.cancelRegion()
+
+    editor.beginRegion({ x: 200, y: 200 })
+    editor.updateRegion({ x: 240, y: 240 })
+    editor.commitRegion()
+
+    expect(editor.regions().map((region) => region.number)).toEqual([1, 2])
+    expect(editor.buildReport().text).toBe('1. (no note)\n2. (no note)')
+  })
+
   it('gives each committed region its own id', () => {
     const editor = createEditor(capture)
 
@@ -252,6 +271,272 @@ describe('noting what is wrong', () => {
     const before = editor.regions()
 
     editor.annotate('region-99', 'Nothing to attach this to')
+
+    expect(editor.regions()).toEqual(before)
+  })
+})
+
+describe('moving a region', () => {
+  function editorWithARegion() {
+    const editor = createEditor(capture)
+    editor.beginRegion({ x: 100, y: 50 })
+    editor.updateRegion({ x: 260, y: 170 })
+    editor.commitRegion()
+    return editor
+  }
+
+  it('shifts the region by the distance it was dragged', () => {
+    const editor = editorWithARegion()
+
+    editor.moveRegion(editor.regions()[0]!.id, { x: 30, y: -20 })
+
+    expect(editor.regions()[0]?.bounds).toEqual({
+      x: 130,
+      y: 30,
+      width: 160,
+      height: 120,
+    })
+  })
+
+  it('takes the note with the region it belongs to', () => {
+    const editor = editorWithARegion()
+    const [region] = editor.regions()
+    editor.annotate(region!.id, 'Submit button sits 8px too low')
+
+    editor.moveRegion(region!.id, { x: 30, y: 30 })
+
+    expect(editor.buildReport().plan.regions).toEqual([
+      {
+        bounds: { x: 130, y: 80, width: 160, height: 120 },
+        number: 1,
+        note: 'Submit button sits 8px too low',
+      },
+    ])
+  })
+
+  it('keeps a region dragged past the edge on the capture, at its full size', () => {
+    const editor = editorWithARegion()
+
+    editor.moveRegion(editor.regions()[0]!.id, { x: 900, y: 700 })
+
+    expect(editor.regions()[0]?.bounds).toEqual({
+      x: 640,
+      y: 480,
+      width: 160,
+      height: 120,
+    })
+  })
+
+  it('leaves the other regions where they were drawn', () => {
+    const editor = editorWithARegion()
+    editor.beginRegion({ x: 10, y: 10 })
+    editor.updateRegion({ x: 50, y: 50 })
+    editor.commitRegion()
+
+    editor.moveRegion(editor.regions()[0]!.id, { x: 30, y: 30 })
+
+    expect(editor.regions()[1]?.bounds).toEqual({
+      x: 10,
+      y: 10,
+      width: 40,
+      height: 40,
+    })
+    expect(editor.regions().map((region) => region.number)).toEqual([1, 2])
+  })
+
+  it('ignores a move naming a region that is not there', () => {
+    const editor = editorWithARegion()
+    const before = editor.regions()
+
+    editor.moveRegion('region-99', { x: 30, y: 30 })
+
+    expect(editor.regions()).toEqual(before)
+  })
+})
+
+describe('resizing a region', () => {
+  function editorWithARegion() {
+    const editor = createEditor(capture)
+    editor.beginRegion({ x: 100, y: 50 })
+    editor.updateRegion({ x: 260, y: 170 })
+    editor.commitRegion()
+    return editor
+  }
+
+  it('tightens the region onto the bounds it was pulled to', () => {
+    const editor = editorWithARegion()
+
+    editor.resizeRegion(editor.regions()[0]!.id, {
+      x: 120,
+      y: 60,
+      width: 100,
+      height: 80,
+    })
+
+    expect(editor.regions()[0]?.bounds).toEqual({
+      x: 120,
+      y: 60,
+      width: 100,
+      height: 80,
+    })
+  })
+
+  it('keeps the note and the number the region was carrying', () => {
+    const editor = editorWithARegion()
+    const [region] = editor.regions()
+    editor.annotate(region!.id, 'Card padding is wrong on the right')
+
+    editor.resizeRegion(region!.id, { x: 120, y: 60, width: 100, height: 80 })
+
+    expect(editor.buildReport().text).toBe(
+      '1. Card padding is wrong on the right',
+    )
+    expect(editor.regions()[0]).toEqual(
+      expect.objectContaining({ id: region!.id, number: 1 }),
+    )
+  })
+
+  it('normalizes an edge pulled past the one opposite it', () => {
+    const editor = editorWithARegion()
+
+    editor.resizeRegion(editor.regions()[0]!.id, {
+      x: 260,
+      y: 170,
+      width: -160,
+      height: -120,
+    })
+
+    expect(editor.regions()[0]?.bounds).toEqual({
+      x: 100,
+      y: 50,
+      width: 160,
+      height: 120,
+    })
+  })
+
+  it('keeps a region pulled past the edge inside the capture', () => {
+    const editor = editorWithARegion()
+
+    editor.resizeRegion(editor.regions()[0]!.id, {
+      x: 700,
+      y: 500,
+      width: 300,
+      height: 300,
+    })
+
+    expect(editor.regions()[0]?.bounds).toEqual({
+      x: 700,
+      y: 500,
+      width: 100,
+      height: 100,
+    })
+  })
+
+  it('refuses a resize that would collapse the region to nothing', () => {
+    const editor = editorWithARegion()
+
+    editor.resizeRegion(editor.regions()[0]!.id, {
+      x: 120,
+      y: 60,
+      width: 0,
+      height: 80,
+    })
+
+    expect(editor.regions()[0]?.bounds).toEqual({
+      x: 100,
+      y: 50,
+      width: 160,
+      height: 120,
+    })
+  })
+
+  it('ignores a resize naming a region that is not there', () => {
+    const editor = editorWithARegion()
+    const before = editor.regions()
+
+    editor.resizeRegion('region-99', { x: 0, y: 0, width: 10, height: 10 })
+
+    expect(editor.regions()).toEqual(before)
+  })
+})
+
+describe('deleting a region', () => {
+  function editorWithThreeRegions() {
+    const editor = createEditor(capture)
+    for (const start of [10, 100, 200]) {
+      editor.beginRegion({ x: start, y: start })
+      editor.updateRegion({ x: start + 40, y: start + 40 })
+      editor.commitRegion()
+    }
+    return editor
+  }
+
+  it('drops the region it names, and the note written against it', () => {
+    const editor = editorWithThreeRegions()
+    const [first, second, third] = editor.regions()
+    editor.annotate(second!.id, 'Not a divergence after all')
+
+    editor.removeRegion(second!.id)
+
+    expect(editor.regions().map((region) => region.id)).toEqual([
+      first!.id,
+      third!.id,
+    ])
+    expect(
+      editor.regions().some((region) => region.note.includes('after all')),
+    ).toBe(false)
+  })
+
+  it('closes the gap in the numbering the deleted region left', () => {
+    const editor = editorWithThreeRegions()
+
+    editor.removeRegion(editor.regions()[0]!.id)
+
+    expect(editor.regions().map((region) => region.number)).toEqual([1, 2])
+  })
+
+  it('keeps every note with the region it was written against', () => {
+    const editor = editorWithThreeRegions()
+    const [first, second, third] = editor.regions()
+    editor.annotate(first!.id, 'Card padding is wrong')
+    editor.annotate(second!.id, 'Nothing wrong here')
+    editor.annotate(third!.id, 'Submit button sits 8px too low')
+
+    editor.removeRegion(second!.id)
+
+    expect(editor.buildReport().text).toBe(
+      '1. Card padding is wrong\n2. Submit button sits 8px too low',
+    )
+  })
+
+  it('numbers the next region drawn after the ones left behind', () => {
+    const editor = editorWithThreeRegions()
+
+    editor.removeRegion(editor.regions()[1]!.id)
+    editor.beginRegion({ x: 400, y: 400 })
+    editor.updateRegion({ x: 440, y: 440 })
+    editor.commitRegion()
+
+    expect(editor.regions().map((region) => region.number)).toEqual([1, 2, 3])
+  })
+
+  it('still tells the regions apart after one is deleted and another drawn', () => {
+    const editor = editorWithThreeRegions()
+
+    editor.removeRegion(editor.regions()[2]!.id)
+    editor.beginRegion({ x: 400, y: 400 })
+    editor.updateRegion({ x: 440, y: 440 })
+    editor.commitRegion()
+
+    const ids = editor.regions().map((region) => region.id)
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it('ignores a deletion naming a region that is not there', () => {
+    const editor = editorWithThreeRegions()
+    const before = editor.regions()
+
+    editor.removeRegion('region-99')
 
     expect(editor.regions()).toEqual(before)
   })

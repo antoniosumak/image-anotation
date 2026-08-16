@@ -25,8 +25,9 @@ export type Region = {
   id: string
   /**
    * What the developer and the coding agent call this region: its 1-based
-   * position on the capture, assigned when it is committed. Kept apart from
-   * `id`, which identifies a region rather than naming it.
+   * position among the regions on the capture, so deleting one closes the gap
+   * it left. Kept apart from `id`, which identifies a region rather than
+   * naming it, and so survives the renumbering.
    */
   number: number
   bounds: Bounds

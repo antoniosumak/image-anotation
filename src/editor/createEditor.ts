@@ -36,6 +36,17 @@ function describeRegions(regions: Region[]): string {
     .join('\n')
 }
 
+/**
+ * A number names a region by where it sits among the others, so the numbers
+ * close up behind a deleted one — a report never says "3." with two regions
+ * drawn. Notes travel with their regions, not with the numbers.
+ */
+function numbered(regions: Region[]): Region[] {
+  return regions.map((region, index) =>
+    region.number === index + 1 ? region : { ...region, number: index + 1 },
+  )
+}
+
 function boundsBetween(from: Point, to: Point): Bounds {
   return {
     x: Math.min(from.x, to.x),
@@ -69,6 +80,46 @@ export function createEditor(capture: Capture) {
       x: Math.min(Math.max(point.x, 0), capture.width),
       y: Math.min(Math.max(point.y, 0), capture.height),
     }
+  }
+
+  /**
+   * Pins each edge of a rectangle onto the capture, and squares up one pulled
+   * past the edge opposite it — which is what a resize back through itself is.
+   */
+  function fittedOntoCapture(bounds: Bounds): Bounds {
+    return boundsBetween(
+      ontoCapture({ x: bounds.x, y: bounds.y }),
+      ontoCapture({ x: bounds.x + bounds.width, y: bounds.y + bounds.height }),
+    )
+  }
+
+  /**
+   * Slides a rectangle back onto the capture at the size it already is — a
+   * move that ran off the edge stops there rather than being trimmed.
+   */
+  function slidOntoCapture(bounds: Bounds): Bounds {
+    return {
+      ...bounds,
+      x: Math.min(Math.max(bounds.x, 0), Math.max(capture.width - bounds.width, 0)),
+      y: Math.min(
+        Math.max(bounds.y, 0),
+        Math.max(capture.height - bounds.height, 0),
+      ),
+    }
+  }
+
+  /** Puts a region back at new bounds, leaving its number and note alone. */
+  function setBounds(regionId: string, bounds: Bounds) {
+    setState({
+      ...state,
+      regions: state.regions.map((region) =>
+        region.id === regionId ? { ...region, bounds } : region,
+      ),
+    })
+  }
+
+  function regionWith(regionId: string): Region | undefined {
+    return state.regions.find((region) => region.id === regionId)
   }
 
   return {
@@ -125,6 +176,51 @@ export function createEditor(capture: Capture) {
         ...state,
         regions: state.regions.map((region) =>
           region.id === regionId ? { ...region, note } : region,
+        ),
+      })
+    },
+
+    /**
+     * Repositions a region without redrawing it, so the note written against
+     * it — which describes the element, not the coordinates — stays put.
+     */
+    moveRegion(regionId: string, delta: Point) {
+      const region = regionWith(regionId)
+      if (!region) return
+      setBounds(
+        regionId,
+        slidOntoCapture({
+          ...region.bounds,
+          x: region.bounds.x + delta.x,
+          y: region.bounds.y + delta.y,
+        }),
+      )
+    },
+
+    /**
+     * Tightens a region onto the element it points at. Takes the whole
+     * rectangle rather than an edge and a distance: which edge was pulled is
+     * pointer detail, and the bounds are what the region is.
+     */
+    resizeRegion(regionId: string, bounds: Bounds) {
+      if (!regionWith(regionId)) return
+      const fitted = fittedOntoCapture(bounds)
+      // A region pulled shut is a region that locates nothing. Keep the bounds
+      // it had rather than leaving something invisible to grab hold of again.
+      if (fitted.width === 0 || fitted.height === 0) return
+      setBounds(regionId, fitted)
+    },
+
+    /**
+     * Drops a region the developer decided was not a divergence, and the note
+     * written against it — the note only ever meant anything at that region.
+     */
+    removeRegion(regionId: string) {
+      if (!state.regions.some((region) => region.id === regionId)) return
+      setState({
+        ...state,
+        regions: numbered(
+          state.regions.filter((region) => region.id !== regionId),
         ),
       })
     },
