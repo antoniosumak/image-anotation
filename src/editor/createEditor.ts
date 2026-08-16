@@ -157,6 +157,16 @@ export function reportPromptReferencing(
     .join('\n\n')
 }
 
+/**
+ * The count an id was handed out at, or zero for one this editor did not make
+ * — a resumed session's ids are only ever compared against the ones it will
+ * hand out next, so anything unrecognisable just doesn't hold the counter back.
+ */
+function idNumberOf(id: string): number {
+  const drawn = Number(id.replace('region-', ''))
+  return Number.isInteger(drawn) && drawn > 0 ? drawn : 0
+}
+
 function boundsBetween(from: Point, to: Point): Bounds {
   return {
     x: Math.min(from.x, to.x),
@@ -173,10 +183,28 @@ function boundsBetween(from: Point, to: Point): Bounds {
  * test can drive a whole drag and assert on what was committed. It describes
  * reports rather than drawing them — see ADR-0001 and `buildReport`.
  */
-export function createEditor(capture: Capture) {
-  let state: EditorState = { regions: [], draft: null, designReference: null }
+export function createEditor(
+  capture: Capture,
+  /**
+   * What was already drawn on this capture, when it was reopened from a report
+   * rather than pasted fresh. Resuming is the same editor with regions already
+   * in it — nothing downstream can tell the difference, which is the point.
+   */
+  resumed?: Pick<EditorState, 'regions' | 'designReference'>,
+) {
+  let state: EditorState = {
+    regions: numbered(resumed?.regions ?? []),
+    draft: null,
+    designReference: resumed?.designReference ?? null,
+  }
   let dragOrigin: Point | null = null
-  let regionsDrawn = 0
+  // Ids are handed out by count, so resuming has to start past every one
+  // already in use rather than reissue an id — the count alone would not, since
+  // a session saved after a deletion carries fewer regions than ids given out.
+  let regionsDrawn = state.regions.reduce(
+    (highest, region) => Math.max(highest, idNumberOf(region.id)),
+    0,
+  )
   const listeners = new Set<() => void>()
 
   function setState(next: EditorState) {

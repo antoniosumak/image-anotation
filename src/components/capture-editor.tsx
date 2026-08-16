@@ -9,13 +9,24 @@ import {
   TriangleAlert,
   Trash2,
 } from 'lucide-react'
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 
 import { rasterizeReport } from '#/adapters/canvas'
 import { copyImageToClipboard, copyTextToClipboard } from '#/adapters/clipboard'
 import { followDeepLink } from '#/adapters/deep-link'
 import { writeReportImage } from '#/adapters/filesystem'
-import { loadImageFile, releaseLoadedImage } from '#/adapters/image'
+import {
+  inlineImage,
+  loadImageFile,
+  releaseLoadedImage,
+} from '#/adapters/image'
+import { withSession } from '#/adapters/session-png'
 import { ClaudeMark } from '#/components/claude-mark'
 import { DesignReferencePanel } from '#/components/design-reference-panel'
 import { PanelHeading } from '#/components/panel-heading'
@@ -34,14 +45,16 @@ import {
   reportPromptReferencing,
   reportTextReferencing,
 } from '#/editor/createEditor'
+import type { Session } from '#/editor/session'
 import type {
   Bounds,
   Capture,
   DesignReference,
   Point,
   Region,
+  RenderPlan,
 } from '#/editor/types'
-import { type Size, fitScale, scaledSize } from '#/lib/capture-fit'
+import { type Size, fitScale, scaledSize, zoomedBy } from '#/lib/capture-fit'
 import { PROMPT_LIMIT, claudeCodeLink } from '#/lib/claude-deep-link'
 import {
   HANDLE_SIZE,
@@ -113,39 +126,48 @@ type Gesture =
 
 /**
  * How big the capture is drawn. `fit` shrinks an oversized capture until the
- * whole of it is on the stage; `actual` puts it back on its own pixels, where
- * a one-pixel spacing error is judgeable, and lets the stage scroll. Neither
- * changes the capture, the regions or the report — only what is on screen.
+ * whole of it is on the stage and keeps doing so as the window changes size; a
+ * number is a scale the developer picked with the wheel or the button, and is
+ * held whatever the stage does. Neither changes the capture, the regions or the
+ * report — only what is on screen.
  */
-type Zoom = 'fit' | 'actual'
+type Zoom = 'fit' | number
+
+/**
+ * A capture pixel the developer wants left where it is across a zoom, and where
+ * on screen it was when they said so. Zooming about the pointer is what makes
+ * the wheel usable for detail work: without it, magnifying a corner walks it
+ * off the stage and every notch costs a scroll to find the place again.
+ */
+type ZoomAnchor = { point: Point; clientX: number; clientY: number }
 
 /** Said by whichever button was pressed on an unmarked capture. */
 const NOTHING_TO_SEND = 'Nothing to send — draw a region first'
 
-const COPY_LABEL: Record<CopyState, string> = {
+const COPY_LABEL = {
   idle: 'Copy Image',
   copying: 'Copying…',
   copied: 'Copied',
   failed: 'Copy failed — try again',
   empty: NOTHING_TO_SEND,
-}
+} satisfies Record<CopyState, string>
 
-const WRITE_LABEL: Record<WriteState, string> = {
+const WRITE_LABEL = {
   idle: 'Write Image, Copy Text',
   writing: 'Writing…',
   copied: 'Text copied',
   uncopied: 'Text not copied — try again',
   failed: 'Write failed — try again',
   empty: NOTHING_TO_SEND,
-}
+} satisfies Record<WriteState, string>
 
-const SEND_LABEL: Record<SendState, string> = {
+const SEND_LABEL = {
   idle: 'Send to Claude Code',
   sending: 'Sending…',
   sent: 'Sent',
   failed: 'Send failed — try again',
   empty: NOTHING_TO_SEND,
-}
+} satisfies Record<SendState, string>
 
 /**
  * What the status bar says about the last image written, which is the one
@@ -170,13 +192,19 @@ function writtenPrefix(writeState: WriteState, sendState: SendState): string {
  */
 export function CaptureEditor({
   capture,
+  resumed,
   onClear,
 }: {
   capture: Capture
+  /**
+   * What was drawn on this capture last time, when it arrived as a report
+   * written earlier rather than as a fresh screenshot.
+   */
+  resumed?: Session | null
   /** Discards the capture and everything drawn on it — see `ClearCaptureButton`. */
   onClear: () => void
 }) {
-  const [editor] = useState(() => createEditor(capture))
+  const [editor] = useState(() => createEditor(capture, resumed ?? undefined))
   const [copyState, setCopyState] = useState<CopyState>('idle')
   const [writeState, setWriteState] = useState<WriteState>('idle')
   const [sendState, setSendState] = useState<SendState>('idle')
@@ -187,10 +215,12 @@ export function CaptureEditor({
   const [cursor, setCursor] = useState('crosshair')
   const [zoom, setZoom] = useState<Zoom>('fit')
   const gesture = useRef<Gesture | null>(null)
+  const anchor = useRef<ZoomAnchor | null>(null)
+  const frameRef = useRef<HTMLDivElement>(null)
 
   const [stageRef, stageSize] = useMeasuredSize<HTMLDivElement>()
   const fits = fitScale(capture, stageSize)
-  const scale = zoom === 'actual' ? 1 : fits
+  const scale = zoom === 'fit' ? fits : zoom
   const drawn = scaledSize(capture, scale)
 
   // What was handed over described the regions as they stood — once they
@@ -260,6 +290,62 @@ export function CaptureEditor({
     return () => window.removeEventListener('keydown', escape)
   }, [editor])
 
+  /**
+   * Ctrl or ⌘ held on the wheel zooms; the wheel alone scrolls the stage, which
+   * is the only way to pan once the capture is bigger than it — dragging on the
+   * capture draws a region. A trackpad pinch arrives here as a ctrl-wheel too,
+   * so both gestures are answered by this one.
+   *
+   * Registered by hand rather than through `onWheel` because React's wheel
+   * listener is passive, and a passive handler cannot stop the browser from
+   * zooming the whole page out from under the capture instead.
+   */
+  useEffect(() => {
+    const stage = stageRef.current
+    if (!stage) return
+
+    const wheel = (event: WheelEvent) => {
+      if (!event.ctrlKey && !event.metaKey) return
+      event.preventDefault()
+
+      const frame = frameRef.current
+      if (!frame) return
+      const box = frame.getBoundingClientRect()
+      anchor.current = {
+        point: {
+          x: (event.clientX - box.left) / scale,
+          y: (event.clientY - box.top) / scale,
+        },
+        clientX: event.clientX,
+        clientY: event.clientY,
+      }
+
+      // Deltas arrive in pixels, lines or pages depending on the device, and a
+      // mouse reporting three lines would otherwise zoom by nothing at all.
+      const perUnit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 400 : 1
+      setZoom(zoomedBy(scale, event.deltaY * perUnit))
+    }
+
+    stage.addEventListener('wheel', wheel, { passive: false })
+    return () => stage.removeEventListener('wheel', wheel)
+  }, [scale, stageRef])
+
+  // Puts the anchored capture pixel back under the pointer, after the browser
+  // has laid the frame out at its new size — where the point landed is a fact
+  // about the frame as drawn, and the frame is re-centred by every zoom.
+  useLayoutEffect(() => {
+    const held = anchor.current
+    anchor.current = null
+
+    const stage = stageRef.current
+    const frame = frameRef.current
+    if (!held || !stage || !frame) return
+
+    const box = frame.getBoundingClientRect()
+    stage.scrollLeft += box.left + held.point.x * scale - held.clientX
+    stage.scrollTop += box.top + held.point.y * scale - held.clientY
+  }, [scale, stageRef])
+
   const beginGesture = (point: Point) => {
     const grab = grabAt(point, regions, scale)
     if (!grab) {
@@ -312,6 +398,22 @@ export function CaptureEditor({
     else editor.commitRegion()
   }
 
+  /**
+   * The report as pixels, with the session that produced it written into the
+   * file. Every way of handing a report over goes through here, so a report is
+   * always reopenable — a developer who marked up ten regions and spotted an
+   * eleventh should be dropping the report back on the page, not starting the
+   * capture again.
+   */
+  const rasterize = async (plan: RenderPlan) => {
+    const attached = editor.designReference()
+    return withSession(await rasterizeReport(plan), {
+      capture: await inlineImage(capture),
+      designReference: attached ? await inlineImage(attached) : null,
+      regions: editor.regions(),
+    })
+  }
+
   const copyImage = async () => {
     // Asked for before anything is asked *about*. The core builds no report
     // from an unmarked capture, and the clipboard is left holding whatever it
@@ -324,7 +426,7 @@ export function CaptureEditor({
 
     setCopyState('copying')
     try {
-      await copyImageToClipboard(await rasterizeReport(report.plan))
+      await copyImageToClipboard(await rasterize(report.plan))
       setCopyState('copied')
     } catch {
       setCopyState('failed')
@@ -349,7 +451,7 @@ export function CaptureEditor({
 
     setWriteState('writing')
     try {
-      const png = await rasterizeReport(report.plan)
+      const png = await rasterize(report.plan)
 
       const body = new FormData()
       body.set('image', png, 'report.png')
@@ -390,7 +492,7 @@ export function CaptureEditor({
 
     setSendState('sending')
     try {
-      const png = await rasterizeReport(report.plan)
+      const png = await rasterize(report.plan)
 
       const body = new FormData()
       body.set('image', png, 'report.png')
@@ -461,10 +563,13 @@ export function CaptureEditor({
               size="sm"
               variant="ghost"
               className="text-muted-foreground"
-              // Only worth offering once the capture is actually being shrunk —
-              // a capture that already fits is at 100% either way.
-              disabled={fits === 1}
-              onClick={() => setZoom(zoom === 'fit' ? 'actual' : 'fit')}
+              // The wheel is the precise way in and this button is the way
+              // back, so it is also where the wheel gets mentioned at all.
+              title="Ctrl or ⌘ + wheel to zoom about the pointer"
+              // Nothing to offer only when both ends are the same place: a
+              // capture that already fits, still sitting where it was put.
+              disabled={fits === 1 && zoom === 'fit'}
+              onClick={() => setZoom(zoom === 'fit' ? 1 : 'fit')}
             >
               {zoom === 'fit' ? <Maximize2 /> : <Minimize2 />}
               {zoom === 'fit' ? 'Actual size' : 'Fit'}
@@ -474,15 +579,19 @@ export function CaptureEditor({
 
         {/* The stage is a fixed part of the layout and the capture is drawn
             inside it, so an oversized image scrolls or shrinks rather than
-            pushing the panels around it off screen. */}
+            pushing the panels around it off screen. It only scrolls once the
+            capture is drawn bigger than fits — a capture that fits is centred
+            with nothing to reach, and rounding it to whole pixels would
+            otherwise be enough to raise a one-pixel scrollbar. */}
         <div
           ref={stageRef}
           className={cn(
             'stage-surface scrollbar-slim relative grid min-h-0 flex-1 p-6',
-            zoom === 'fit' ? 'overflow-hidden' : 'overflow-auto',
+            scale > fits ? 'overflow-auto' : 'overflow-hidden',
           )}
         >
           <div
+            ref={frameRef}
             className="ring-border relative m-auto shadow-2xl ring-1 touch-none select-none"
             style={{
               width: drawn.width,

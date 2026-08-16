@@ -541,6 +541,65 @@ describe('deleting a region', () => {
   })
 })
 
+describe('resuming a capture that was marked up before', () => {
+  /**
+   * What a report written after a deletion carries: two regions, numbered 1
+   * and 2, but holding the first and third ids handed out.
+   */
+  const resumed = {
+    designReference: null,
+    regions: [
+      {
+        id: 'region-1',
+        number: 1,
+        bounds: { x: 10, y: 10, width: 40, height: 40 },
+        note: 'Wrong padding',
+        source: 'human' as const,
+      },
+      {
+        id: 'region-3',
+        number: 2,
+        bounds: { x: 100, y: 100, width: 40, height: 40 },
+        note: '',
+        source: 'human' as const,
+      },
+    ],
+  }
+
+  it('opens holding the regions and notes it was given', () => {
+    const editor = createEditor(capture, resumed)
+
+    expect(editor.regions()).toEqual(resumed.regions)
+    expect(editor.buildReport()?.text).toBe('1. Wrong padding\n2. (no note)')
+  })
+
+  it('opens holding the design reference that was attached', () => {
+    const editor = createEditor(capture, { ...resumed, designReference })
+
+    expect(editor.designReference()).toEqual(designReference)
+  })
+
+  it('gives a region drawn afterwards an id no resumed one is using', () => {
+    const editor = createEditor(capture, resumed)
+
+    editor.beginRegion({ x: 200, y: 200 })
+    editor.updateRegion({ x: 240, y: 240 })
+    editor.commitRegion()
+
+    const ids = editor.regions().map((region) => region.id)
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it('closes up numbering a resumed session arrived with gaps in', () => {
+    const editor = createEditor(capture, {
+      designReference: null,
+      regions: [{ ...resumed.regions[1]!, number: 7 }],
+    })
+
+    expect(editor.regions()[0]!.number).toBe(1)
+  })
+})
+
 describe('building a report', () => {
   it('plans the capture at its natural size', () => {
     const editor = editorWithARegion()

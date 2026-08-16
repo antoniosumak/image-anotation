@@ -21,3 +21,30 @@ export function imageFromTransfer(transfer: DataTransfer | null): Blob | null {
   }
   return null
 }
+
+/** The one image a copied report puts in its HTML — see `copyImageToClipboard`. */
+const IMAGE_IN_HTML = /<img[^>]+src="(data:image\/png;base64,[^"]+)"/
+
+/**
+ * The image a paste carried inside its HTML, which is where a report copied
+ * from this app is still the file it was rather than a re-encoding of its
+ * pixels. Null when the paste carried no HTML, or HTML with no image in it.
+ *
+ * Anything found here is still only a candidate: plenty of pages carry an
+ * inline image, and one copied out of a browser is not what the developer
+ * meant to paste. The caller takes it only once it turns out to be a report —
+ * see `takePaste`.
+ *
+ * The transfer is read before this returns, not after: a `DataTransfer` is
+ * only good inside the handler it arrived in, and an `async` function runs up
+ * to its first `await` before it hands a promise back.
+ */
+export async function imageInTransferHtml(
+  transfer: DataTransfer | null,
+): Promise<Blob | null> {
+  const found = IMAGE_IN_HTML.exec(transfer?.getData('text/html') ?? '')
+  if (!found) return null
+  return fetch(found[1]!)
+    .then((response) => response.blob())
+    .catch(() => null)
+}

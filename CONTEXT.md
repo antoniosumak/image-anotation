@@ -40,6 +40,14 @@ _Avoid_: run, execute, launch, invoke, trigger (all of them claim the tool does 
 The report as a request rather than a description — what the image is, what is being asked for, and the notes. What a sent report carries, as distinct from the text block a developer pastes themselves.
 _Avoid_: message, query, instruction set, command
 
+**Session**:
+Everything one capture was marked up with — the capture itself, the design reference attached to it, and every region and note — written into the report image so dropping that report back on the app reopens it. The report is the save file; there is no second artifact and nothing kept behind the developer's back.
+_Avoid_: state, document, project, save file (as a thing of its own — the report is the file)
+
+**Resume**:
+Opening a report as a capture again, with its regions and notes still editable, rather than as a picture of them.
+_Avoid_: import, load, restore, undo
+
 **Stage**:
 The fixed region of the screen an implementation capture is drawn inside. Its size comes from the window, never from the capture, so an oversized capture is shrunk or scrolled rather than allowed to lay the app out.
 _Avoid_: canvas (taken — the rasterizing adapter), viewport, workspace

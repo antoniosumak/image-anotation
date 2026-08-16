@@ -91,7 +91,9 @@ async function writeWithoutOverwriting(
       await writeFile(path, new Uint8Array(bytes), { flag: 'wx' })
       return path
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+      if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) {
+        throw error
+      }
     }
   }
 

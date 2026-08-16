@@ -32,6 +32,32 @@ puts the annotated PNG on your clipboard. **Write Image, Copy Text** writes the
 same image and copies a text block naming its path, so one paste carries the
 picture and the notes as words.
 
+## Picking a report back up
+
+Every report the app produces carries the **session** that made it — the
+original capture, the design reference, and every region and note — written
+into the PNG as a `tEXt` chunk. Drop a report from `reports/` back on the page
+and it opens where you left it: the clean capture with its regions still on it,
+ready to be moved, renoted, added to and handed over again. Nothing is stored
+outside the file, so a report you keep is a report you can still edit.
+
+The chunk is metadata every other tool ignores, so a report is still an
+ordinary PNG anywhere else.
+
+**Copy Image** round-trips too. The clipboard sanitizes `image/png` — it
+decodes the pixels and encodes them afresh, which drops everything around them
+— so the report goes on the clipboard twice: as that image, and as one line of
+HTML with the same PNG inline, which is handed over as written. Pasting into
+this app takes the copy out of the HTML and reopens the session; pasting
+anywhere else gets the image, from the HTML in a rich-text editor and from the
+PNG everywhere else.
+
+HTML rather than a web custom format, which is the other way to get bytes
+across untouched: custom formats are Chromium's alone, and reading one back
+means asking the clipboard for it, which needs permission on every paste.
+`text/html` is carried by every browser and arrives on the paste event without
+being asked for. Verified round-tripping in Chrome and in Zen.
+
 If you run the app from somewhere other than the project you're marking up, set
 `UI_DIVERGENCE_PROJECT_DIR` to the project's absolute path. Reports are written
 inside it, and it's where the session opens.
@@ -75,7 +101,8 @@ One seam and a ring of thin adapters around it.
   the single thing that rasterizes a plan; `transfer.ts` picks the image out of
   a paste or a drop; `clipboard.ts` writes the annotated PNG back; `image.ts`
   decodes an image's natural size; `deep-link.ts` follows the URL that opens
-  Claude Code. `filesystem.ts` is the one server function — a browser page
+  Claude Code; `session-png.ts` writes the session into a report and reads it
+  back out. `filesystem.ts` is the one server function — a browser page
   can't write to a local path, and a path is the whole point.
 - **`src/components/capture-editor.tsx`** — translates pointer events into
   intents and draws what the core reports. It holds no region state of its own,

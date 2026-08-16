@@ -31,7 +31,7 @@ export const HANDLE_SIZE = 10
 export const EDGE_GRAB = 10
 
 /** The cursor that says which way a handle pulls. */
-export const HANDLE_CURSOR: Record<ResizeHandle, string> = {
+export const HANDLE_CURSOR = {
   nw: 'nwse-resize',
   se: 'nwse-resize',
   ne: 'nesw-resize',
@@ -40,7 +40,7 @@ export const HANDLE_CURSOR: Record<ResizeHandle, string> = {
   s: 'ns-resize',
   e: 'ew-resize',
   w: 'ew-resize',
-}
+} satisfies Record<ResizeHandle, string>
 
 /** A handle sits on the corner or the edge midpoint it is named after. */
 export function handleCenter(bounds: Bounds, handle: ResizeHandle): Point {

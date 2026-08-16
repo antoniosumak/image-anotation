@@ -32,6 +32,26 @@ export function fitScale(capture: Size, stage: Size | null): number {
   return Math.min(1, stage.width / capture.width, stage.height / capture.height)
 }
 
+/**
+ * How far the capture can be zoomed by hand. The floor is well under any fit
+ * scale so a huge capture can still be pulled back from; the ceiling is where
+ * a capture pixel is a block big enough to place a region edge on exactly.
+ */
+const MIN_ZOOM = 0.1
+const MAX_ZOOM = 8
+
+/**
+ * The scale one wheel gesture moves to, from the scale it started at.
+ *
+ * Exponential, so a notch is the same proportion wherever it is turned — a
+ * linear step that felt right at 100% would crawl at 800% and overshoot the
+ * whole way past 20%. `pixels` is the wheel's delta normalized to pixels;
+ * lower the divisor to make the wheel bite harder.
+ */
+export function zoomedBy(scale: number, pixels: number): number {
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, scale * Math.exp(-pixels / 400)))
+}
+
 /** The size the capture is drawn at, rounded to whole device pixels. */
 export function scaledSize(capture: Size, scale: number): Size {
   return {

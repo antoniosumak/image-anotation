@@ -6,14 +6,17 @@ import { Frame, ImagePlus, Moon, Sun } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import { loadImageFile, releaseLoadedImage } from '#/adapters/image'
+import { sessionIn } from '#/adapters/session-png'
 import {
   NO_IMAGE_MESSAGE,
   UNREADABLE_IMAGE_MESSAGE,
   carriesFiles,
   imageFromTransfer,
+  imageInTransferHtml,
 } from '#/adapters/transfer'
 import { CaptureEditor } from '#/components/capture-editor'
 import { TAKES_IMAGES_ATTRIBUTE } from '#/components/design-reference-panel'
+import type { Session } from '#/editor/session'
 import type { Capture } from '#/editor/types'
 
 export const Route = createFileRoute('/')({ component: Home })
@@ -41,6 +44,12 @@ function aimedElsewhere(target: EventTarget | null): boolean {
 
 function Home() {
   const [capture, setCapture] = useState<Capture | null>(null)
+  // What was drawn on this capture the last time it was marked up, when it
+  // arrived as a report written earlier rather than as a fresh screenshot.
+  const [resumed, setResumed] = useState<Session | null>(null)
+  // Which capture this is, rather than which pixels: the editor is rebuilt for
+  // every one, and a restored capture's src is its whole image inline.
+  const [taken, setTaken] = useState(0)
   const [captureError, setCaptureError] = useState<string | null>(null)
   // Only for the drop outline — whether a file is currently over the page.
   const [dropping, setDropping] = useState(false)
@@ -55,21 +64,47 @@ function Home() {
 
   // Both ways an image arrives end here: a paste and a drop carry the same
   // thing, and either one replaces the capture.
-  const takeCapture = async (transfer: DataTransfer | null) => {
-    const image = imageFromTransfer(transfer)
+  //
+  // A report this app produced is one of the images that can arrive: it carries
+  // the session that made it, so putting one back reopens the capture with its
+  // regions and notes still on it rather than starting again from a picture of
+  // them. Anything else is a fresh capture, which is the common case — see
+  // `Session`.
+  const takeCapture = async (image: Blob | null) => {
     if (!image) {
       setCaptureError(NO_IMAGE_MESSAGE)
       return
     }
     try {
-      const next = await loadImageFile(image)
+      const session = await sessionIn(image)
+      const next = session ? session.capture : await loadImageFile(image)
       releasePreviousCapture()
       previous.current = next
       setCaptureError(null)
+      setResumed(session)
+      setTaken((count) => count + 1)
       setCapture(next)
     } catch {
       setCaptureError(UNREADABLE_IMAGE_MESSAGE)
     }
+  }
+
+  /**
+   * A paste, which is the one way in where the image on the event is not
+   * necessarily the image that was copied: the clipboard sanitizes `image/png`
+   * by encoding the pixels afresh, and a report loses the session it was
+   * carrying on the way through. A report copied from here puts an untouched
+   * copy of itself in the paste's HTML as well — see `copyImageToClipboard`.
+   *
+   * That copy is taken only when it turns out to carry a session. HTML copied
+   * from a web page can hold an inline image of its own, and preferring that
+   * to what the developer actually pasted would be a strange way to lose a
+   * screenshot.
+   */
+  const takePaste = async (carried: Promise<Blob | null>, pasted: Blob | null) => {
+    const inHtml = await carried
+    const report = inHtml && (await sessionIn(inHtml)) ? inHtml : null
+    await takeCapture(report ?? pasted)
   }
 
   /**
@@ -82,6 +117,7 @@ function Home() {
     releasePreviousCapture()
     previous.current = null
     setCaptureError(null)
+    setResumed(null)
     setCapture(null)
   }
 
@@ -89,7 +125,12 @@ function Home() {
     const onPaste = (event: ClipboardEvent) => {
       if (aimedElsewhere(event.target)) return
       event.preventDefault()
-      void takeCapture(event.clipboardData)
+      // Both read off the event before anything is awaited — a `DataTransfer`
+      // is only good for as long as the handler it arrived in.
+      void takePaste(
+        imageInTransferHtml(event.clipboardData),
+        imageFromTransfer(event.clipboardData),
+      )
     }
 
     document.addEventListener('paste', onPaste)
@@ -121,7 +162,10 @@ function Home() {
       onDragLeave={(event) => {
         // Dragging between two elements fires a leave on the one behind — only
         // a leave that goes nowhere inside the page is the file actually gone.
-        if (event.currentTarget.contains(event.relatedTarget as Node | null)) {
+        if (
+          event.relatedTarget instanceof Node &&
+          event.currentTarget.contains(event.relatedTarget)
+        ) {
           return
         }
         setDropping(false)
@@ -130,7 +174,7 @@ function Home() {
         setDropping(false)
         if (aimedElsewhere(event.target)) return
         event.preventDefault()
-        void takeCapture(event.dataTransfer)
+        void takeCapture(imageFromTransfer(event.dataTransfer))
       }}
     >
       <header className="border-border/80 bg-background flex h-12 shrink-0 items-center gap-3 border-b px-4">
@@ -165,8 +209,9 @@ function Home() {
 
       {capture ? (
         <CaptureEditor
-          key={capture.src}
+          key={taken}
           capture={capture}
+          resumed={resumed}
           onClear={clearCapture}
         />
       ) : (
