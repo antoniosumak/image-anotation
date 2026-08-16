@@ -65,18 +65,23 @@ no coordinates standing in for them. See `docs/adr/0001`.
   version rather than tracking `latest`. Vite-based, so the dev loop stays fast
   while iterating on canvas interaction, and it provides the server functions
   this app needs to write a report to a local path.
-- **[shadcn/ui](https://ui.shadcn.com/) on the [Base UI](https://base-ui.com/)
-  foundation**, configured in `components.json`. Add components with:
-
-  ```bash
-  npx shadcn@latest add <component>
-  ```
-
-  They land in `src/components/ui/`. `src/components/ui/button.tsx` is vendored
-  by hand rather than pulled from the registry — the sandbox this was scaffolded
-  in cannot reach `ui.shadcn.com`.
+- **`@plerivo/ui`** on the [Base UI](https://base-ui.com/) foundation, with
+  `@plerivo/tokens` and `@plerivo/tailwind-config` behind it. Import a component
+  from its own entry point — `import { Button } from '@plerivo/ui/button'`.
+  `src/components/ui/alert-dialog.tsx` is the one primitive still kept locally:
+  the library ships a `Dialog`, and an alert dialog is deliberately not one —
+  it cannot be dismissed by clicking away from it.
 - **[Tailwind CSS](https://tailwindcss.com/)** v4, via `@tailwindcss/vite`.
-  Theme tokens live in `src/styles.css`.
+  `src/styles.css` imports the plerivo preset and adds only what is this app's
+  own — the stage surface, the drop targets, the scrollbars. Two things about
+  that preset are worth knowing before editing styles:
+
+  - it resets `--color-*`, so Tailwind's stock palette (`bg-neutral-500`,
+    `border-white`) does not exist. Fixed colours are stated as constants —
+    see `src/lib/region-style.ts`.
+  - `@source` is required for the library's own classes. Tailwind skips
+    `node_modules` when scanning for classes to generate, and without it every
+    component renders unstyled with no warning.
 - **[Vitest](https://vitest.dev/)**, the Vite-native choice.
 
 Routing is file-based: a file in `src/routes/` becomes a route, and

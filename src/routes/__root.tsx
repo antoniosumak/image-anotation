@@ -1,3 +1,4 @@
+import { ThemeProvider, themeInitScript } from '@plerivo/ui/theme-provider'
 import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
@@ -30,15 +31,18 @@ export const Route = createRootRoute({
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    // Dark by default: the tool is looked at beside a design tool and a code
-    // editor, and a page of white beside either of them is the bright thing on
-    // the screen. Light is still fully defined — the class is the only switch.
-    <html lang="en" className="dark">
+    // `data-theme` carries the whole palette, and the design system's tokens
+    // hang the default border and outline colours off its presence — so it is
+    // written into the markup rather than left for the script to add. The
+    // script then corrects it to the developer's actual theme before first
+    // paint, which is the mismatch the hydration warning is suppressed for.
+    <html lang="en" data-theme="light" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         <HeadContent />
       </head>
       <body>
-        {children}
+        <ThemeProvider>{children}</ThemeProvider>
         <TanStackDevtools
           config={{
             position: 'bottom-right',

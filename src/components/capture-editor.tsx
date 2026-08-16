@@ -1,3 +1,6 @@
+import { Button } from '@plerivo/ui/button'
+import { Separator } from '@plerivo/ui/separator'
+import { Textarea } from '@plerivo/ui/textarea'
 import {
   Check,
   Copy,
@@ -24,8 +27,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '#/components/ui/alert-dialog'
-import { Button } from '#/components/ui/button'
-import { Textarea } from '#/components/ui/textarea'
 import { createEditor, reportTextReferencing } from '#/editor/createEditor'
 import type {
   Bounds,
@@ -45,6 +46,7 @@ import {
   resizedBounds,
 } from '#/lib/region-handles'
 import {
+  HANDLE_BORDER,
   LABEL_BACKGROUND,
   LABEL_GAP,
   LABEL_NUMBER_SIZE,
@@ -339,7 +341,7 @@ export function CaptureEditor({
             {WRITE_LABEL[writeState]}
           </Button>
 
-          <span className="bg-border mx-1 h-5 w-px" aria-hidden />
+          <Separator orientation="vertical" className="mx-1 h-5" />
 
           <ClearCaptureButton onClear={onClear} />
 
@@ -634,7 +636,7 @@ function RegionHandle({
   return (
     <span
       data-slot="region-handle"
-      className="pointer-events-none absolute rounded-xs border border-white shadow-sm"
+      className="pointer-events-none absolute rounded-xs shadow-sm"
       style={{
         // The outline's border sits inside its bounds, so these offsets are
         // measured from inside it — pull them back out onto the drawn edge.
@@ -644,6 +646,7 @@ function RegionHandle({
         height: HANDLE_SIZE,
         transform: 'translate(-50%, -50%)',
         background: REGION_STROKE,
+        border: `1px solid ${HANDLE_BORDER}`,
       }}
     />
   )

@@ -6,6 +6,14 @@
 export const REGION_STROKE = '#e11d48'
 export const REGION_STROKE_WIDTH = 3
 
+/**
+ * The hairline around a resize handle, so it stays visible against whatever
+ * the capture happens to show underneath it. Stated here rather than as a
+ * Tailwind class because the design system's tokens clear Tailwind's stock
+ * palette — and because everything else about how a region looks lives here.
+ */
+export const HANDLE_BORDER = '#ffffff'
+
 /** The plate carrying a region's number, and its note where there is one. */
 export const LABEL_BACKGROUND = REGION_STROKE
 export const LABEL_TEXT_COLOR = '#ffffff'

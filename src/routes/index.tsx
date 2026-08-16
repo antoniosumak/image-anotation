@@ -1,5 +1,8 @@
+import { Button } from '@plerivo/ui/button'
+import { Kbd, KbdGroup } from '@plerivo/ui/kbd'
+import { useTheme } from '@plerivo/ui/theme-provider'
 import { createFileRoute } from '@tanstack/react-router'
-import { Frame, ImagePlus } from 'lucide-react'
+import { Frame, ImagePlus, Moon, Sun } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import { loadImageFile, releaseLoadedImage } from '#/adapters/image'
@@ -137,7 +140,7 @@ function Home() {
         <h1 className="text-[13px] font-medium tracking-tight">
           UI Divergence Feedback
         </h1>
-        <span className="text-border select-none">/</span>
+        <span className="text-muted-foreground/40 select-none">/</span>
         <p className="text-muted-foreground truncate text-[13px] tabular-nums">
           {capture
             ? `${capture.width} × ${capture.height}`
@@ -147,6 +150,8 @@ function Home() {
         <p className="text-muted-foreground ml-auto hidden text-xs md:block">
           Mark up what drifted, hand the report to your coding agent
         </p>
+
+        <ThemeToggle />
       </header>
 
       {captureError ? (
@@ -184,7 +189,7 @@ function Home() {
 function EmptyStage() {
   return (
     <main className="stage-surface grid min-h-0 flex-1 place-items-center p-8">
-      <div className="border-border bg-card/40 flex w-full max-w-md flex-col items-center gap-5 rounded-xl border border-dashed px-8 py-14 text-center">
+      <div className="drop-target bg-card/40 flex w-full max-w-md flex-col items-center gap-5 rounded-xl border border-dashed px-8 py-14 text-center">
         <span className="bg-muted text-muted-foreground flex size-11 items-center justify-center rounded-full">
           <ImagePlus className="size-5" />
         </span>
@@ -194,9 +199,14 @@ function EmptyStage() {
             Paste an implementation capture
           </h2>
           <p className="text-muted-foreground text-[13px] leading-relaxed text-balance">
-            Press <Kbd>Ctrl</Kbd>
-            <span className="mx-0.5">/</span>
-            <Kbd>⌘</Kbd> <Kbd>V</Kbd>, or drop an image anywhere on this page.
+            Press{' '}
+            <KbdGroup>
+              <Kbd>Ctrl</Kbd>
+              <span>/</span>
+              <Kbd>⌘</Kbd>
+              <Kbd>V</Kbd>
+            </KbdGroup>
+            {', or drop an image anywhere on this page.'}
           </p>
         </div>
       </div>
@@ -204,10 +214,25 @@ function EmptyStage() {
   )
 }
 
-function Kbd({ children }: { children: React.ReactNode }) {
+/**
+ * Light and dark are both real palettes in the design system's tokens, and
+ * which one is wanted depends on what the developer has the rest of their
+ * screen set to — so it is a switch rather than a decision made here. The
+ * choice is remembered, and applied before first paint by `themeInitScript`.
+ */
+function ThemeToggle() {
+  const { resolvedTheme, setTheme } = useTheme()
+  const goingDark = resolvedTheme === 'light'
+
   return (
-    <kbd className="border-border bg-muted text-foreground inline-flex h-5 min-w-5 items-center justify-center rounded border px-1.5 font-mono text-[11px] font-medium">
-      {children}
-    </kbd>
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      className="text-muted-foreground ml-1"
+      aria-label={goingDark ? 'Switch to dark theme' : 'Switch to light theme'}
+      onClick={() => setTheme(goingDark ? 'dark' : 'light')}
+    >
+      {goingDark ? <Moon /> : <Sun />}
+    </Button>
   )
 }

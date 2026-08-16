@@ -1,6 +1,14 @@
-import { AlertDialog as AlertDialogPrimitive } from '@base-ui/react/alert-dialog'
+/**
+ * The one primitive still kept locally. `@plerivo/ui` ships a `Dialog`, but
+ * not an alert dialog, and the difference is the point: this one cannot be
+ * dismissed by clicking away from it, because it is only ever opened when the
+ * answer matters and a stray click is not an answer. Its buttons are the
+ * design system's, so it still looks like everything around it.
+ */
 
-import { buttonVariants } from '#/components/ui/button'
+import { AlertDialog as AlertDialogPrimitive } from '@base-ui/react/alert-dialog'
+import { buttonVariants } from '@plerivo/ui/button'
+
 import { cn } from '#/lib/utils'
 
 // Aliased rather than wrapped: the root renders no element of its own — it is
@@ -23,7 +31,7 @@ function AlertDialogBackdrop({
     <AlertDialogPrimitive.Backdrop
       data-slot="alert-dialog-backdrop"
       className={cn(
-        'fixed inset-0 z-50 bg-black/50 transition-opacity duration-150 data-[closed]:opacity-0 data-[starting-style]:opacity-0',
+        'fixed inset-0 z-50 bg-[rgb(0_0_0/0.5)] transition-opacity duration-150 data-[closed]:opacity-0 data-[starting-style]:opacity-0',
         className,
       )}
       {...props}

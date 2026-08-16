@@ -1,3 +1,4 @@
+import { Button } from '@plerivo/ui/button'
 import { ImagePlus, X } from 'lucide-react'
 import { useState } from 'react'
 
@@ -7,7 +8,6 @@ import {
   imageFromTransfer,
 } from '#/adapters/transfer'
 import { PanelHeading } from '#/components/panel-heading'
-import { Button } from '#/components/ui/button'
 import type { DesignReference } from '#/editor/types'
 import { cn } from '#/lib/utils'
 
@@ -96,10 +96,11 @@ export function DesignReferencePanel({
       <div
         tabIndex={0}
         aria-label="Design reference — paste or drop an image"
+        data-dragging={dragging ? '' : undefined}
         className={cn(
-          'focus-visible:border-ring focus-visible:ring-ring/50 border-border rounded-lg border border-dashed outline-none transition-colors focus-visible:ring-[3px]',
+          'drop-target focus-visible:ring-ring/50 rounded-lg border border-dashed outline-none transition-colors focus-visible:ring-[3px]',
           designReference ? 'bg-card p-1.5' : 'p-6',
-          dragging && 'border-ring bg-accent',
+          dragging && 'bg-accent',
         )}
         onPaste={(event) => {
           event.preventDefault()

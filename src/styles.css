@@ -1,104 +1,50 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
-
-@custom-variant dark (&:is(.dark *));
+/*
+ * The design system. `@plerivo/tailwind-config` pulls in `@plerivo/tokens`
+ * (the raw variables and their Tailwind `@theme` mapping) and aliases them
+ * onto the semantic namespace this app is written against — `bg-background`,
+ * `border-border`, `text-muted-foreground` and the rest — so almost nothing
+ * here names a colour directly.
+ *
+ * Two things it does that are worth knowing about:
+ *  - the tokens reset `--color-*`, so Tailwind's stock palette is gone.
+ *    `bg-neutral-500`, `border-white` and friends do not exist; anything that
+ *    genuinely needs a fixed colour states it as a constant instead.
+ *  - dark is `[data-theme="dark"]` on the document, set before first paint by
+ *    `themeInitScript` — see `src/routes/__root.tsx`.
+ */
+@import '@plerivo/tailwind-config';
 
 /*
- * A flat, neutral product surface: near-monochrome chrome, one indigo accent
- * reserved for what can be pressed, and a recessed stage that reads as a
- * separate depth from the panels around it. Nothing here is decorative — the
- * only saturated colour on screen should be the regions drawn on a capture.
+ * The design system's components carry Tailwind classes in their compiled
+ * output, and Tailwind ignores `node_modules` when it goes looking for classes
+ * to generate. Without this the components render with none of their styling —
+ * a button comes out as inline text with the icon stacked above the label —
+ * and nothing warns you, because every class involved is spelled correctly.
+ */
+@source '../node_modules/@plerivo/ui/dist/**/*.js';
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/*
+ * The ground a capture sits on. The app's own token, because it is a surface
+ * the design system has no opinion about — built out of plerivo's neutral
+ * scale so it moves with the rest of the palette.
  */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.16 0.004 285.8);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.16 0.004 285.8);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.16 0.004 285.8);
-  --primary: oklch(0.53 0.19 281);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.97 0.001 286.4);
-  --secondary-foreground: oklch(0.24 0.006 285.9);
-  --muted: oklch(0.968 0.001 286.4);
-  --muted-foreground: oklch(0.53 0.014 285.9);
-  --accent: oklch(0.965 0.002 286.4);
-  --accent-foreground: oklch(0.24 0.006 285.9);
-  --destructive: oklch(0.58 0.222 27.3);
-  --destructive-foreground: oklch(0.99 0 0);
-  --border: oklch(0.918 0.004 286.3);
-  --input: oklch(0.9 0.004 286.3);
-  --ring: oklch(0.53 0.19 281);
-  --radius: 0.5rem;
-
-  /* The ground the capture floats on, and the grid printed across it. */
-  --stage: oklch(0.973 0.001 286.4);
-  --stage-dot: oklch(0.88 0.003 286.3);
+  --stage: var(--plerivo-color-neutral-50);
+  --stage-dot: var(--plerivo-color-neutral-200);
 }
 
-.dark {
-  --background: oklch(0.163 0.004 285.8);
-  --foreground: oklch(0.975 0.002 286.3);
-  --card: oklch(0.197 0.004 285.9);
-  --card-foreground: oklch(0.975 0.002 286.3);
-  --popover: oklch(0.205 0.004 285.9);
-  --popover-foreground: oklch(0.975 0.002 286.3);
-  --primary: oklch(0.585 0.185 281);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.245 0.005 286);
-  --secondary-foreground: oklch(0.975 0.002 286.3);
-  --muted: oklch(0.232 0.005 286);
-  --muted-foreground: oklch(0.665 0.011 286.1);
-  --accent: oklch(0.262 0.006 286);
-  --accent-foreground: oklch(0.975 0.002 286.3);
-  --destructive: oklch(0.62 0.208 25.7);
-  --destructive-foreground: oklch(0.99 0 0);
-  --border: oklch(0.272 0.006 286);
-  --input: oklch(0.318 0.006 286);
-  --ring: oklch(0.585 0.185 281);
-
-  --stage: oklch(0.126 0.003 285.8);
-  --stage-dot: oklch(0.245 0.005 286);
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+[data-theme='dark'] {
+  --stage: var(--plerivo-color-neutral-950);
+  --stage-dot: var(--plerivo-color-neutral-700);
 }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  html {
-    color-scheme: dark;
-  }
   body {
     @apply bg-background text-foreground;
-    font-family:
-      ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
-      'Helvetica Neue', Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     font-synthesis-weight: none;
@@ -111,9 +57,8 @@
 }
 
 /*
- * The recessed ground a capture sits on. The grid is what says "this is a
- * canvas, and the thing on it is an image" — without it a pale screenshot has
- * no visible edge.
+ * The recessed ground, and the grid that says "this is a canvas, and the thing
+ * on it is an image" — without it a pale screenshot has no visible edge.
  */
 .stage-surface {
   background-color: var(--stage);
@@ -125,10 +70,32 @@
   background-size: 22px 22px;
 }
 
+/*
+ * Where an image can be dropped or pasted.
+ *
+ * The border colour is set here rather than with a `border-input` class
+ * because `@plerivo/tokens` paints `border-color` onto every element from an
+ * *unlayered* rule (`:where([data-theme] *)`), and unlayered CSS outranks
+ * everything in `@layer utilities` however specific the utility is — so no
+ * `border-<colour>` utility can win, and one that looks right in the markup
+ * silently does nothing. This rule is unlayered too, and a class beats
+ * `:where()`, so it lands.
+ *
+ * Worth fixing upstream: the same trap kills `focus-visible:border-ring`
+ * inside the design system's own Button and Textarea.
+ */
+.drop-target {
+  border-color: var(--plerivo-color-semantic-input);
+}
+
+.drop-target[data-dragging] {
+  border-color: var(--plerivo-color-semantic-ring);
+}
+
 /* Scrollbars inside the rail and the stage, kept out of the way. */
 .scrollbar-slim {
   scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
+  scrollbar-color: var(--plerivo-color-semantic-input) transparent;
 }
 
 .scrollbar-slim::-webkit-scrollbar {
@@ -141,12 +108,12 @@
 }
 
 .scrollbar-slim::-webkit-scrollbar-thumb {
-  background-color: var(--border);
+  background-color: var(--plerivo-color-semantic-input);
   border: 3px solid transparent;
   border-radius: 9999px;
   background-clip: content-box;
 }
 
 .scrollbar-slim::-webkit-scrollbar-thumb:hover {
-  background-color: var(--input);
+  background-color: var(--plerivo-color-semantic-muted-foreground);
 }

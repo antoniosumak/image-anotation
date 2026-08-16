@@ -1,3 +1,5 @@
+import { Badge } from '@plerivo/ui/badge'
+
 /**
  * A heading for one of the rail's panels. Shared so the design reference and
  * the divergences beneath it read as two parts of one column rather than two
@@ -17,9 +19,9 @@ export function PanelHeading({
         {children}
       </h2>
       {count ? (
-        <span className="bg-muted text-muted-foreground rounded-full px-1.5 text-[11px] tabular-nums">
+        <Badge variant="muted" className="px-1.5 py-0 text-[11px]">
           {count}
-        </span>
+        </Badge>
       ) : null}
     </div>
   )
