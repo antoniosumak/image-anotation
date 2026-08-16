@@ -1,0 +1,147 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+/*
+ * The design system. `@plerivo/tailwind-config` pulls in `@plerivo/tokens`
+ * (the raw variables and their Tailwind `@theme` mapping) and aliases them
+ * onto the semantic namespace this app is written against — `bg-background`,
+ * `border-border`, `text-muted-foreground` and the rest — so almost nothing
+ * here names a colour directly.
+ *
+ * Two things it does that are worth knowing about:
+ *  - the tokens reset `--color-*`, so Tailwind's stock palette is gone.
+ *    `bg-neutral-500`, `border-white` and friends do not exist; anything that
+ *    genuinely needs a fixed colour states it as a constant instead.
+ *  - dark is `[data-theme="dark"]` on the document, set before first paint by
+ *    `themeInitScript` — see `src/routes/__root.tsx`.
+ */
+@import '@plerivo/tailwind-config';
+
+/*
+ * The design system's components carry Tailwind classes in their compiled
+ * output, and Tailwind ignores `node_modules` when it goes looking for classes
+ * to generate. Without this the components render with none of their styling —
+ * a button comes out as inline text with the icon stacked above the label —
+ * and nothing warns you, because every class involved is spelled correctly.
+ */
+@source '../node_modules/@plerivo/ui/dist/**/*.js';
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/*
+ * The ground a capture sits on. The app's own token, because it is a surface
+ * the design system has no opinion about — built out of plerivo's neutral
+ * scale so it moves with the rest of the palette.
+ */
+:root {
+  --stage: var(--plerivo-color-neutral-50);
+  --stage-dot: var(--plerivo-color-neutral-200);
+}
+
+[data-theme='dark'] {
+  --stage: var(--plerivo-color-neutral-950);
+  --stage-dot: var(--plerivo-color-neutral-700);
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-synthesis-weight: none;
+    /* The app is one screen that never scrolls: the stage and the rail each
+       scroll inside themselves, so an oversized capture cannot move the
+       chrome around it. */
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+}
+
+/*
+ * The recessed ground, and the grid that says "this is a canvas, and the thing
+ * on it is an image" — without it a pale screenshot has no visible edge.
+ */
+.stage-surface {
+  background-color: var(--stage);
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    var(--stage-dot) 1px,
+    transparent 0
+  );
+  background-size: 22px 22px;
+}
+
+/*
+ * Where an image can be dropped or pasted.
+ *
+ * The border colour is set here rather than with a `border-input` class
+ * because `@plerivo/tokens` paints `border-color` onto every element from an
+ * *unlayered* rule (`:where([data-theme] *)`), and unlayered CSS outranks
+ * everything in `@layer utilities` however specific the utility is — so no
+ * `border-<colour>` utility can win, and one that looks right in the markup
+ * silently does nothing. This rule is unlayered too, and a class beats
+ * `:where()`, so it lands.
+ *
+ * Worth fixing upstream: the same trap kills `focus-visible:border-ring`
+ * inside the design system's own Button and Textarea.
+ */
+.drop-target {
+  border-color: var(--plerivo-color-semantic-input);
+}
+
+.drop-target[data-dragging] {
+  border-color: var(--plerivo-color-semantic-ring);
+}
+
+/*
+ * Send to Claude Code wears Claude's own orange rather than the design
+ * system's primary. The button is the one control that hands work to something
+ * outside this app, and carrying that thing's colour and mark is what says so
+ * before the label has been read.
+ *
+ * Unlayered, like `.drop-target` above and for the same reason: the button's
+ * `bg-primary` and `hover:bg-primary/90` are Tailwind utilities living in
+ * `@layer utilities`, and unlayered CSS outranks anything layered however
+ * specific it is — so these land without reaching for `!important`.
+ *
+ * The same orange in both themes. It is a brand colour, not a palette entry,
+ * and it holds up on either ground.
+ */
+.send-to-claude {
+  --claude-orange: #d97757;
+  /* `focus-visible:ring-ring/50` mixes its ring from this, so the focus ring
+     comes out orange too rather than reverting to the app's accent. */
+  --color-ring: var(--claude-orange);
+
+  background-color: var(--claude-orange);
+  color: #fff;
+}
+
+.send-to-claude:hover:not(:disabled) {
+  background-color: #c96442;
+}
+
+/* Scrollbars inside the rail and the stage, kept out of the way. */
+.scrollbar-slim {
+  scrollbar-width: thin;
+  scrollbar-color: var(--plerivo-color-semantic-input) transparent;
+}
+
+.scrollbar-slim::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.scrollbar-slim::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-slim::-webkit-scrollbar-thumb {
+  background-color: var(--plerivo-color-semantic-input);
+  border: 3px solid transparent;
+  border-radius: 9999px;
+  background-clip: content-box;
+}
+
+.scrollbar-slim::-webkit-scrollbar-thumb:hover {
+  background-color: var(--plerivo-color-semantic-muted-foreground);
+}
