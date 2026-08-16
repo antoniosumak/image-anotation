@@ -59,6 +59,19 @@ function Home() {
     }
   }
 
+  /**
+   * Done with this screen, on to the next. The capture goes, and with it the
+   * editor built around it — which is what takes the design reference, every
+   * region and every note with it, since all of them hang off the capture and
+   * none of them are written down anywhere else.
+   */
+  const clearCapture = () => {
+    if (previous.current) releaseLoadedImage(previous.current)
+    previous.current = null
+    setCaptureError(null)
+    setCapture(null)
+  }
+
   useEffect(() => {
     const onPaste = (event: ClipboardEvent) => {
       if (aimedElsewhere(event.target)) return
@@ -109,7 +122,11 @@ function Home() {
       ) : null}
 
       {capture ? (
-        <CaptureEditor key={capture.src} capture={capture} />
+        <CaptureEditor
+          key={capture.src}
+          capture={capture}
+          onClear={clearCapture}
+        />
       ) : (
         <div className="text-muted-foreground flex h-64 w-full max-w-2xl items-center justify-center rounded-lg border border-dashed">
           Press <kbd className="mx-1 font-mono">Ctrl/Cmd + V</kbd> to paste a

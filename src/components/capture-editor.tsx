@@ -6,6 +6,16 @@ import { copyImageToClipboard, copyTextToClipboard } from '#/adapters/clipboard'
 import { writeReportImage } from '#/adapters/filesystem'
 import { loadImageFile, releaseLoadedImage } from '#/adapters/image'
 import { DesignReferencePanel } from '#/components/design-reference-panel'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '#/components/ui/alert-dialog'
 import { Button } from '#/components/ui/button'
 import { Textarea } from '#/components/ui/textarea'
 import { createEditor, reportTextReferencing } from '#/editor/createEditor'
@@ -36,7 +46,12 @@ import {
 } from '#/lib/region-style'
 import { cn } from '#/lib/utils'
 
-type CopyState = 'idle' | 'copying' | 'copied' | 'failed'
+/**
+ * How handing the report over went. `empty` is the editor core refusing to
+ * build a report at all — asked for with nothing marked up, both ways of
+ * handing one over say so here rather than sending an unmarked capture.
+ */
+type CopyState = 'idle' | 'copying' | 'copied' | 'failed' | 'empty'
 
 /**
  * How the other way of handing a report over went. The image landing on disk
@@ -44,7 +59,13 @@ type CopyState = 'idle' | 'copying' | 'copied' | 'failed'
  * separately, and saying "text copied" when the clipboard refused it would
  * send the developer off to paste nothing.
  */
-type WriteState = 'idle' | 'writing' | 'copied' | 'uncopied' | 'failed'
+type WriteState =
+  | 'idle'
+  | 'writing'
+  | 'copied'
+  | 'uncopied'
+  | 'failed'
+  | 'empty'
 
 /**
  * The drag under way, as pointer bookkeeping — which region is being edited
@@ -56,11 +77,15 @@ type Gesture =
   | { kind: 'move'; regionId: string; last: Point; from: Bounds }
   | { kind: 'resize'; regionId: string; handle: ResizeHandle; from: Bounds }
 
+/** Said by whichever button was pressed on an unmarked capture. */
+const NOTHING_TO_SEND = 'Nothing to send — draw a region first'
+
 const COPY_LABEL: Record<CopyState, string> = {
   idle: 'Copy Image',
   copying: 'Copying…',
   copied: 'Copied',
   failed: 'Copy failed — try again',
+  empty: NOTHING_TO_SEND,
 }
 
 const WRITE_LABEL: Record<WriteState, string> = {
@@ -69,13 +94,21 @@ const WRITE_LABEL: Record<WriteState, string> = {
   copied: 'Text copied',
   uncopied: 'Text not copied — try again',
   failed: 'Write failed — try again',
+  empty: NOTHING_TO_SEND,
 }
 
 /**
  * Drives the editor core from pointer events and draws what it reports. It
  * holds no state of its own: every rectangle on screen came out of the core.
  */
-export function CaptureEditor({ capture }: { capture: Capture }) {
+export function CaptureEditor({
+  capture,
+  onClear,
+}: {
+  capture: Capture
+  /** Discards the capture and everything drawn on it — see `ClearCaptureButton`. */
+  onClear: () => void
+}) {
   const [editor] = useState(() => createEditor(capture))
   const [copyState, setCopyState] = useState<CopyState>('idle')
   const [writeState, setWriteState] = useState<WriteState>('idle')
@@ -196,10 +229,18 @@ export function CaptureEditor({ capture }: { capture: Capture }) {
   }
 
   const copyImage = async () => {
+    // Asked for before anything is asked *about*. The core builds no report
+    // from an unmarked capture, and the clipboard is left holding whatever it
+    // already had rather than a picture that complains about nothing.
+    const report = editor.buildReport()
+    if (!report) {
+      setCopyState('empty')
+      return
+    }
+
     setCopyState('copying')
     try {
-      const { plan } = editor.buildReport()
-      await copyImageToClipboard(await rasterizeReport(plan))
+      await copyImageToClipboard(await rasterizeReport(report.plan))
       setCopyState('copied')
     } catch {
       setCopyState('failed')
@@ -212,11 +253,18 @@ export function CaptureEditor({ capture }: { capture: Capture }) {
    * paste gives the coding agent the picture and the notes as words at once.
    */
   const writeImageAndCopyText = async () => {
+    // Built once, so the image written and the text copied describe the same
+    // regions rather than two reads of the editor a moment apart — and asked
+    // for up front, so an unmarked capture is turned away before a file is
+    // written for it.
+    const report = editor.buildReport()
+    if (!report) {
+      setWriteState('empty')
+      return
+    }
+
     setWriteState('writing')
     try {
-      // Built once, so the image written and the text copied describe the same
-      // regions rather than two reads of the editor a moment apart.
-      const report = editor.buildReport()
       const png = await rasterizeReport(report.plan)
 
       const body = new FormData()
@@ -240,17 +288,19 @@ export function CaptureEditor({ capture }: { capture: Capture }) {
   return (
     <div className="flex flex-col items-start gap-4">
       <div className="flex flex-col items-start gap-2">
+        {/* Both export buttons stay pressable with nothing marked up. A
+            developer who presses one is told there is nothing to send, which
+            says more than a button that quietly cannot be pressed. */}
         <div className="flex items-center gap-3">
-          <Button onClick={copyImage} disabled={regions.length === 0}>
-            {COPY_LABEL[copyState]}
-          </Button>
+          <Button onClick={copyImage}>{COPY_LABEL[copyState]}</Button>
           <Button
             variant="secondary"
             onClick={writeImageAndCopyText}
-            disabled={writeState === 'writing' || regions.length === 0}
+            disabled={writeState === 'writing'}
           >
             {WRITE_LABEL[writeState]}
           </Button>
+          <ClearCaptureButton onClear={onClear} />
           <p className="text-muted-foreground text-sm">
             {regions.length === 0
               ? 'Drag a rectangle over what is wrong. Escape abandons a drag.'
@@ -324,6 +374,38 @@ export function CaptureEditor({ capture }: { capture: Capture }) {
         />
       </div>
     </div>
+  )
+}
+
+/**
+ * Finishing with one screen and starting on the next. Clearing throws away the
+ * whole capture — its design reference, every region and every note — and none
+ * of it is written down anywhere, so it is asked about first.
+ *
+ * The confirmation is unconditional. Working out whether there is anything
+ * worth losing would mean sometimes asking and sometimes not, and a
+ * destructive button that only sometimes stops to ask is one a developer
+ * learns to click through.
+ */
+function ClearCaptureButton({ onClear }: { onClear: () => void }) {
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger render={<Button variant="ghost" />}>
+        Clear
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogTitle>Clear this capture?</AlertDialogTitle>
+        <AlertDialogDescription>
+          This discards the implementation capture, its design reference, and
+          every region and note drawn on it. Nothing is saved anywhere, so there
+          is no getting it back.
+        </AlertDialogDescription>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Keep marking up</AlertDialogCancel>
+          <AlertDialogAction onClick={onClear}>Clear</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }
 

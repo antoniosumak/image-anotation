@@ -179,7 +179,7 @@ describe('drawing a region', () => {
     editor.commitRegion()
 
     expect(editor.regions().map((region) => region.number)).toEqual([1, 2])
-    expect(editor.buildReport().text).toBe('1. (no note)\n2. (no note)')
+    expect(editor.buildReport()!.text).toBe('1. (no note)\n2. (no note)')
   })
 
   it('gives each committed region its own id', () => {
@@ -316,7 +316,7 @@ describe('moving a region', () => {
 
     editor.moveRegion(region!.id, { x: 30, y: 30 })
 
-    expect(editor.buildReport().plan.regions).toEqual([
+    expect(editor.buildReport()!.plan.regions).toEqual([
       {
         bounds: { x: 130, y: 80, width: 160, height: 120 },
         number: 1,
@@ -391,7 +391,7 @@ describe('resizing a region', () => {
 
     editor.resizeRegion(region!.id, { x: 120, y: 60, width: 100, height: 80 })
 
-    expect(editor.buildReport().text).toBe(
+    expect(editor.buildReport()!.text).toBe(
       '1. Card padding is wrong on the right',
     )
     expect(editor.regions()[0]).toEqual(
@@ -499,7 +499,7 @@ describe('deleting a region', () => {
 
     editor.removeRegion(second!.id)
 
-    expect(editor.buildReport().text).toBe(
+    expect(editor.buildReport()!.text).toBe(
       '1. Card padding is wrong\n2. Submit button sits 8px too low',
     )
   })
@@ -539,9 +539,9 @@ describe('deleting a region', () => {
 
 describe('building a report', () => {
   it('plans the capture at its natural size', () => {
-    const editor = createEditor(capture)
+    const editor = editorWithARegion()
 
-    const { plan } = editor.buildReport()
+    const { plan } = editor.buildReport()!
 
     expect(plan.width).toBe(800)
     expect(plan.height).toBe(600)
@@ -558,7 +558,7 @@ describe('building a report', () => {
     editor.updateRegion({ x: 260, y: 170 })
     editor.commitRegion()
 
-    const { plan } = editor.buildReport()
+    const { plan } = editor.buildReport()!
 
     expect(plan.regions).toEqual([
       { bounds: { x: 100, y: 50, width: 160, height: 120 }, number: 1, note: '' },
@@ -579,7 +579,7 @@ describe('building a report', () => {
     editor.annotate(first!.id, 'Card padding is wrong on the right')
     editor.annotate(second!.id, 'Submit button sits 8px too low')
 
-    expect(editor.buildReport().plan.regions).toEqual([
+    expect(editor.buildReport()!.plan.regions).toEqual([
       {
         bounds: { x: 10, y: 10, width: 40, height: 40 },
         number: 1,
@@ -594,12 +594,14 @@ describe('building a report', () => {
   })
 
   it('leaves a region still being dragged out of the plan', () => {
-    const editor = createEditor(capture)
+    const editor = editorWithARegion()
 
-    editor.beginRegion({ x: 100, y: 50 })
-    editor.updateRegion({ x: 260, y: 170 })
+    editor.beginRegion({ x: 300, y: 200 })
+    editor.updateRegion({ x: 400, y: 260 })
 
-    expect(editor.buildReport().plan.regions).toEqual([])
+    expect(editor.buildReport()!.plan.regions).toEqual([
+      { bounds: { x: 100, y: 50, width: 160, height: 120 }, number: 1, note: '' },
+    ])
   })
 
   it('lists every region by number with its note', () => {
@@ -616,7 +618,7 @@ describe('building a report', () => {
     editor.annotate(first!.id, 'Card padding is wrong on the right')
     editor.annotate(second!.id, 'Submit button sits 8px too low')
 
-    expect(editor.buildReport().text).toBe(
+    expect(editor.buildReport()!.text).toBe(
       '1. Card padding is wrong on the right\n2. Submit button sits 8px too low',
     )
   })
@@ -628,7 +630,7 @@ describe('building a report', () => {
     editor.updateRegion({ x: 50, y: 50 })
     editor.commitRegion()
 
-    expect(editor.buildReport().text).toBe('1. (no note)')
+    expect(editor.buildReport()!.text).toBe('1. (no note)')
   })
 
   it('keeps a note written over several lines under its own number', () => {
@@ -646,7 +648,7 @@ describe('building a report', () => {
 
     // Every line that starts an entry starts with its number — a second line
     // of a note can't be mistaken for the next region.
-    expect(editor.buildReport().text).toBe(
+    expect(editor.buildReport()!.text).toBe(
       '1. Padding is wrong\n   and so is the gap\n2. Button sits too low',
     )
   })
@@ -659,16 +661,47 @@ describe('building a report', () => {
     editor.commitRegion()
     editor.annotate(editor.regions()[0]!.id, '   ')
 
-    const report = editor.buildReport()
+    const report = editor.buildReport()!
 
     expect(report.text).toBe('1. (no note)')
     expect(report.plan.regions[0]?.note).toBe('')
   })
 
-  it('has nothing to say when no region was drawn', () => {
+  it('builds no report at all when no region was drawn', () => {
     const editor = createEditor(capture)
 
-    expect(editor.buildReport().text).toBe('')
+    expect(editor.buildReport()).toBeNull()
+  })
+
+  // A rectangle the developer is still dragging out is not yet a divergence —
+  // it is only committed regions that are reported, so a report asked for
+  // mid-drag is asked for against nothing.
+  it('builds no report from a drag that has not been committed', () => {
+    const editor = createEditor(capture)
+
+    editor.beginRegion({ x: 100, y: 50 })
+    editor.updateRegion({ x: 260, y: 170 })
+
+    expect(editor.buildReport()).toBeNull()
+  })
+
+  it('takes the report away again when the last region is deleted', () => {
+    const editor = editorWithARegion()
+    editor.annotate(editor.regions()[0]!.id, 'Not a divergence after all')
+
+    editor.removeRegion(editor.regions()[0]!.id)
+
+    expect(editor.buildReport()).toBeNull()
+  })
+
+  it('builds a report again once a region is drawn on a bare capture', () => {
+    const editor = createEditor(capture)
+
+    editor.beginRegion({ x: 100, y: 50 })
+    editor.updateRegion({ x: 260, y: 170 })
+    editor.commitRegion()
+
+    expect(editor.buildReport()?.text).toBe('1. (no note)')
   })
 
   it('builds the same report every time from the same regions and notes', () => {
@@ -685,7 +718,7 @@ describe('building a report', () => {
   it('plans no design reference when none is attached', () => {
     const editor = editorWithARegion()
 
-    const { plan } = editor.buildReport()
+    const { plan } = editor.buildReport()!
 
     expect(plan.designReference).toBeNull()
     expect(plan.width).toBe(800)
@@ -696,7 +729,7 @@ describe('building a report', () => {
     const editor = editorWithARegion()
     editor.annotate(editor.regions()[0]!.id, 'Card padding is wrong')
 
-    expect(editor.buildReport().text).toBe('1. Card padding is wrong')
+    expect(editor.buildReport()!.text).toBe('1. Card padding is wrong')
   })
 })
 
@@ -744,7 +777,7 @@ describe('attaching a design reference', () => {
     editor.removeDesignReference()
 
     expect(editor.designReference()).toBeNull()
-    expect(editor.buildReport().text).toBe('1. Card padding is wrong')
+    expect(editor.buildReport()!.text).toBe('1. Card padding is wrong')
   })
 
   it('lets regions be drawn with one attached, on the capture as before', () => {
@@ -777,7 +810,7 @@ describe('building a report with a design reference', () => {
   }
 
   it('plans the design reference beside the capture, at its natural size', () => {
-    const { plan } = editorWithBothSides().buildReport()
+    const { plan } = editorWithBothSides().buildReport()!
 
     expect(plan.designReference).toEqual({
       src: 'blob:design',
@@ -786,14 +819,14 @@ describe('building a report with a design reference', () => {
   })
 
   it('makes room for both sides, and for the taller of the two', () => {
-    const { plan } = editorWithBothSides().buildReport()
+    const { plan } = editorWithBothSides().buildReport()!
 
     expect(plan.width).toBe(1724)
     expect(plan.height).toBe(700)
   })
 
   it('leaves the capture at the origin, so regions stay where they were drawn', () => {
-    const { plan } = editorWithBothSides().buildReport()
+    const { plan } = editorWithBothSides().buildReport()!
 
     expect(plan.capture).toEqual({
       src: 'blob:capture',
@@ -809,20 +842,21 @@ describe('building a report with a design reference', () => {
   })
 
   it('tells the coding agent which side is which', () => {
-    const text = editorWithBothSides().buildReport().text
+    const text = editorWithBothSides().buildReport()!.text
 
     expect(text).toBe(
       'The implementation capture is on the left, and the design reference it should match is on the right. The numbered regions mark divergences on the implementation capture.\n\n1. Card padding is wrong',
     )
   })
 
-  it('still says which side is which with nothing marked up yet', () => {
+  // Both sides of the screen, and still nothing pointed at on either: a design
+  // reference says what the screen should look like, never what is wrong with
+  // it, so attaching one is not a substitute for marking up a divergence.
+  it('builds no report from a design reference alone', () => {
     const editor = createEditor(capture)
     editor.attachDesignReference(designReference)
 
-    expect(editor.buildReport().text).toBe(
-      'The implementation capture is on the left, and the design reference it should match is on the right. The numbered regions mark divergences on the implementation capture.',
-    )
+    expect(editor.buildReport()).toBeNull()
   })
 
   it('drops it from the report once it is removed', () => {
@@ -830,7 +864,7 @@ describe('building a report with a design reference', () => {
 
     editor.removeDesignReference()
 
-    const { plan } = editor.buildReport()
+    const { plan } = editor.buildReport()!
     expect(plan.designReference).toBeNull()
     expect(plan.width).toBe(800)
     expect(plan.height).toBe(600)
@@ -856,7 +890,7 @@ describe('handing the report over as one paste', () => {
   }
 
   it('says where the annotated image was written, then lists every region', () => {
-    const report = editorWithTwoNotedRegions().buildReport()
+    const report = editorWithTwoNotedRegions().buildReport()!
 
     expect(reportTextReferencing(report, IMAGE_PATH)).toBe(
       `The report image is at ${IMAGE_PATH}.\n\n` +
@@ -866,13 +900,13 @@ describe('handing the report over as one paste', () => {
   })
 
   it('carries the report text it was given rather than listing the regions again', () => {
-    const report = editorWithTwoNotedRegions().buildReport()
+    const report = editorWithTwoNotedRegions().buildReport()!
 
     expect(reportTextReferencing(report, IMAGE_PATH)).toContain(report.text)
   })
 
   it('still lists a region nothing was written against', () => {
-    const report = editorWithRegionsAt(10).buildReport()
+    const report = editorWithRegionsAt(10).buildReport()!
 
     expect(reportTextReferencing(report, IMAGE_PATH)).toBe(
       `The report image is at ${IMAGE_PATH}.\n\n1. (no note)`,
@@ -884,23 +918,15 @@ describe('handing the report over as one paste', () => {
     editor.annotate(editor.regions()[0]!.id, 'Card padding is wrong')
     editor.attachDesignReference(designReference)
 
-    expect(reportTextReferencing(editor.buildReport(), IMAGE_PATH)).toBe(
+    expect(reportTextReferencing(editor.buildReport()!, IMAGE_PATH)).toBe(
       `The report image is at ${IMAGE_PATH}.\n\n` +
         'The implementation capture is on the left, and the design reference it should match is on the right. The numbered regions mark divergences on the implementation capture.\n\n' +
         '1. Card padding is wrong',
     )
   })
 
-  it('says only where the image is when nothing was marked up', () => {
-    const report = createEditor(capture).buildReport()
-
-    expect(reportTextReferencing(report, IMAGE_PATH)).toBe(
-      `The report image is at ${IMAGE_PATH}.`,
-    )
-  })
-
   it('names a different image each time one is written, leaving earlier text blocks pointing at their own', () => {
-    const report = editorWithTwoNotedRegions().buildReport()
+    const report = editorWithTwoNotedRegions().buildReport()!
     const earlier = reportTextReferencing(report, IMAGE_PATH)
 
     const later = reportTextReferencing(

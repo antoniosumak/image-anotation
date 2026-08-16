@@ -350,9 +350,15 @@ export function createEditor(capture: Capture) {
      * Describes the report rather than drawing it: the canvas adapter is the
      * only thing that rasterizes. A region still mid-drag is not in the plan —
      * only committed regions are reported.
+     *
+     * There is no report until a region is drawn, and saying so here is what
+     * guards every way of handing one over: a capture with nothing marked on it
+     * is a complaint that names nothing, and the coding agent would be left
+     * guessing at what it was being shown.
      */
-    buildReport(): Report {
+    buildReport(): Report | null {
       const { designReference } = state
+      if (state.regions.length === 0) return null
       return {
         plan: {
           ...layOutSides(capture, designReference),
