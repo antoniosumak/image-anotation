@@ -8,7 +8,13 @@ import { DesignReferencePanel } from '#/components/design-reference-panel'
 import { Button } from '#/components/ui/button'
 import { Textarea } from '#/components/ui/textarea'
 import { createEditor } from '#/editor/createEditor'
-import type { Bounds, Capture, Point, Region } from '#/editor/types'
+import type {
+  Bounds,
+  Capture,
+  DesignReference,
+  Point,
+  Region,
+} from '#/editor/types'
 import {
   HANDLE_SIZE,
   RESIZE_HANDLES,
@@ -64,26 +70,20 @@ export function CaptureEditor({ capture }: { capture: Capture }) {
     editor.getState,
   )
 
-  // The object URL behind the design reference is this component's to release:
-  // the editor core holds the string, and never learns it has been replaced.
-  const attachDesignReference = async (image: Blob) => {
-    const next = await loadImageFile(image)
+  // Puts a design reference beside the capture, or none. The object URL behind
+  // the one it replaces is this component's to release: the editor core holds
+  // the string, and never learns it has been replaced.
+  const showDesignReference = (next: DesignReference | null) => {
     const previous = editor.designReference()
-    editor.attachDesignReference(next)
+    if (next) editor.attachDesignReference(next)
+    else editor.removeDesignReference()
     setCopyState('idle')
     if (previous) releaseLoadedImage(previous)
   }
 
-  const removeDesignReference = () => {
-    const previous = editor.designReference()
-    editor.removeDesignReference()
-    setCopyState('idle')
-    if (previous) releaseLoadedImage(previous)
-  }
-
-  // On unmount only — attaching and removing release the one they replace.
-  // The editor is remounted when a new capture is pasted, which is what takes
-  // the design reference off with the regions it was attached alongside.
+  // On unmount only — showing one releases the one it replaced. The editor is
+  // remounted when a new capture arrives, which is what takes the design
+  // reference off with the regions it was attached alongside.
   useEffect(
     () => () => {
       const attached = editor.designReference()
@@ -222,8 +222,8 @@ export function CaptureEditor({ capture }: { capture: Capture }) {
 
         <DesignReferencePanel
           designReference={designReference}
-          onAttach={attachDesignReference}
-          onRemove={removeDesignReference}
+          onAttach={async (image) => showDesignReference(await loadImageFile(image))}
+          onRemove={() => showDesignReference(null)}
         />
 
         <NotePanel

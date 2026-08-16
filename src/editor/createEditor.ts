@@ -26,7 +26,7 @@ export type EditorState = {
  * as not, but the coding agent gets the text too, and one sentence there beats
  * captions burned over pixels the developer is asking it to judge.
  */
-const SIDES =
+const SIDES_PREAMBLE =
   'The implementation capture is on the left, and the design reference it should match is on the right. The numbered regions mark divergences on the implementation capture.'
 
 /**
@@ -75,7 +75,7 @@ function numbered(regions: Region[]): Region[] {
  * The capture staying at the origin is what lets a region's bounds be the same
  * in capture pixels and in report pixels.
  */
-function roomForBothSides(
+function layOutSides(
   capture: Capture,
   designReference: DesignReference | null,
 ): Omit<RenderPlan, 'regions'> {
@@ -341,7 +341,7 @@ export function createEditor(capture: Capture) {
       const { designReference } = state
       return {
         plan: {
-          ...roomForBothSides(capture, designReference),
+          ...layOutSides(capture, designReference),
           regions: state.regions.map((region) => ({
             bounds: region.bounds,
             number: region.number,
@@ -349,7 +349,7 @@ export function createEditor(capture: Capture) {
           })),
         },
         // Which side is which only needs saying when there are two of them.
-        text: [designReference ? SIDES : '', describeRegions(state.regions)]
+        text: [designReference ? SIDES_PREAMBLE : '', describeRegions(state.regions)]
           .filter(Boolean)
           .join('\n\n'),
       }

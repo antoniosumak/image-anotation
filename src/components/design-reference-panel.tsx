@@ -1,15 +1,20 @@
 import { useState } from 'react'
 
-import { imageFromTransfer } from '#/adapters/transfer'
+import {
+  NO_IMAGE_MESSAGE,
+  UNREADABLE_IMAGE_MESSAGE,
+  imageFromTransfer,
+} from '#/adapters/transfer'
 import { Button } from '#/components/ui/button'
 import type { DesignReference } from '#/editor/types'
 import { cn } from '#/lib/utils'
 
 /**
- * Marks the elements that take an image of their own, so the page-wide paste
- * handler — which replaces the capture — knows a paste was not aimed at it.
+ * Marks a part of the page that takes images of its own, so the page-wide
+ * handlers — which replace the capture, discarding every region and note drawn
+ * against it — know an image dropped or pasted here was not meant for them.
  */
-export const IMAGE_TARGET_ATTRIBUTE = 'data-image-target'
+export const TAKES_IMAGES_ATTRIBUTE = 'data-takes-images'
 
 /**
  * The design reference beside the capture: what the screen was meant to look
@@ -34,26 +39,45 @@ export function DesignReferencePanel({
   const take = async (transfer: DataTransfer | null) => {
     const image = imageFromTransfer(transfer)
     if (!image) {
-      setError('That carried no image.')
+      setError(NO_IMAGE_MESSAGE)
       return
     }
     try {
       await onAttach(image)
       setError(null)
     } catch {
-      setError('That image could not be read.')
+      setError(UNREADABLE_IMAGE_MESSAGE)
     }
   }
 
   return (
-    <section className="flex w-96 shrink-0 flex-col gap-3">
+    // The whole panel takes the drop, not just the dashed box inside it: a
+    // drop that lands on the heading or the caption was still aimed here, and
+    // falling through to the page would replace the capture and take every
+    // region with it.
+    <section
+      {...{ [TAKES_IMAGES_ATTRIBUTE]: '' }}
+      className={cn(
+        'flex w-96 shrink-0 flex-col gap-3',
+        dragging && 'cursor-copy',
+      )}
+      onDragOver={(event) => {
+        event.preventDefault()
+        setDragging(true)
+      }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={(event) => {
+        event.preventDefault()
+        setDragging(false)
+        void take(event.dataTransfer)
+      }}
+    >
       <h2 className="text-sm font-medium">Design reference</h2>
 
       {/* Focusable, because a paste goes to whatever has focus: clicking here
           is how the developer says this paste is a design reference rather
           than a new capture. Dropping needs no such aiming. */}
       <div
-        {...{ [IMAGE_TARGET_ATTRIBUTE]: '' }}
         tabIndex={0}
         aria-label="Design reference — paste or drop an image"
         className={cn(
@@ -64,18 +88,6 @@ export function DesignReferencePanel({
         onPaste={(event) => {
           event.preventDefault()
           void take(event.clipboardData)
-        }}
-        onDragOver={(event) => {
-          event.preventDefault()
-          setDragging(true)
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(event) => {
-          event.preventDefault()
-          // The page takes a drop as a new capture; this one was aimed here.
-          event.stopPropagation()
-          setDragging(false)
-          void take(event.dataTransfer)
         }}
       >
         {designReference ? (

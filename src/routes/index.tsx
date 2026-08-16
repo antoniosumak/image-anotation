@@ -2,9 +2,14 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
 
 import { loadImageFile, releaseLoadedImage } from '#/adapters/image'
-import { imageFromTransfer } from '#/adapters/transfer'
+import {
+  NO_IMAGE_MESSAGE,
+  UNREADABLE_IMAGE_MESSAGE,
+  carriesFiles,
+  imageFromTransfer,
+} from '#/adapters/transfer'
 import { CaptureEditor } from '#/components/capture-editor'
-import { IMAGE_TARGET_ATTRIBUTE } from '#/components/design-reference-panel'
+import { TAKES_IMAGES_ATTRIBUTE } from '#/components/design-reference-panel'
 import type { Capture } from '#/editor/types'
 
 export const Route = createFileRoute('/')({ component: Home })
@@ -16,16 +21,17 @@ function isTypingTarget(target: EventTarget | null): boolean {
 }
 
 /**
- * Whether a paste was aimed at something other than the capture. Somewhere the
- * developer is typing — notes are text fields — or the design reference, which
- * takes images of its own. Replacing the capture throws away every region and
- * note drawn against it, so it only happens when the paste was meant for it.
+ * Whether a paste or a drop was aimed at something other than the capture:
+ * somewhere the developer is typing — notes are text fields — or the design
+ * reference, which takes images of its own. Replacing the capture throws away
+ * every region and note drawn against it, so it only happens when the image
+ * was meant for it.
  */
 function aimedElsewhere(target: EventTarget | null): boolean {
   if (isTypingTarget(target)) return true
   return (
     target instanceof HTMLElement &&
-    target.closest(`[${IMAGE_TARGET_ATTRIBUTE}]`) !== null
+    target.closest(`[${TAKES_IMAGES_ATTRIBUTE}]`) !== null
   )
 }
 
@@ -36,7 +42,12 @@ function Home() {
 
   // Both ways an image arrives end here: a paste and a drop carry the same
   // thing, and either one replaces the capture.
-  const takeCapture = async (image: Blob) => {
+  const takeCapture = async (transfer: DataTransfer | null) => {
+    const image = imageFromTransfer(transfer)
+    if (!image) {
+      setCaptureError(NO_IMAGE_MESSAGE)
+      return
+    }
     try {
       const next = await loadImageFile(image)
       if (previous.current) releaseLoadedImage(previous.current)
@@ -44,22 +55,15 @@ function Home() {
       setCaptureError(null)
       setCapture(next)
     } catch {
-      setCaptureError('That image could not be read.')
+      setCaptureError(UNREADABLE_IMAGE_MESSAGE)
     }
   }
 
   useEffect(() => {
     const onPaste = (event: ClipboardEvent) => {
       if (aimedElsewhere(event.target)) return
-
-      const image = imageFromTransfer(event.clipboardData)
-      if (!image) {
-        setCaptureError('That paste carried no image.')
-        return
-      }
-
       event.preventDefault()
-      void takeCapture(image)
+      void takeCapture(event.clipboardData)
     }
 
     document.addEventListener('paste', onPaste)
@@ -72,19 +76,21 @@ function Home() {
   }, [])
 
   return (
-    // A drop anywhere but the design reference is a capture — the page is one
-    // big target, so a file dragged out of a folder has somewhere to land.
+    // A file dropped anywhere but the design reference is a capture — the page
+    // is one big target, so an image dragged out of a folder has somewhere to
+    // land. Files only: text dragged into a note is the browser's to handle.
     <main
       className="flex flex-col items-start gap-6 p-8"
-      onDragOver={(event) => event.preventDefault()}
-      onDrop={(event) => {
-        event.preventDefault()
-        const image = imageFromTransfer(event.dataTransfer)
-        if (!image) {
-          setCaptureError('That carried no image.')
+      onDragOver={(event) => {
+        if (aimedElsewhere(event.target) || !carriesFiles(event.dataTransfer)) {
           return
         }
-        void takeCapture(image)
+        event.preventDefault()
+      }}
+      onDrop={(event) => {
+        if (aimedElsewhere(event.target)) return
+        event.preventDefault()
+        void takeCapture(event.dataTransfer)
       }}
     >
       <header className="flex flex-col gap-1">
