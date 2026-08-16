@@ -25,10 +25,15 @@ npm run test:watch
 npm run typecheck
 ```
 
-Tests are Vitest, and by design they cover only the editor core — the one seam
-that carries logic. Drag ergonomics, canvas rasterization, clipboard writes and
-the server function's filesystem write are deliberately untested; they are thin
-adapters, cheap to verify by using the app and expensive to test meaningfully.
+Tests are Vitest. Right now there is exactly one, asserting that `cn` resolves
+conflicting Tailwind classes — it exists to prove the harness runs, and it will
+be replaced rather than built on.
+
+The intended shape, once there is logic to test: cover only the editor core —
+the one seam that carries value — and leave drag ergonomics, canvas
+rasterization, clipboard writes and the server function's filesystem write
+untested, as thin adapters that are cheap to verify by using the app and
+expensive to test meaningfully.
 
 ## The stack
 
