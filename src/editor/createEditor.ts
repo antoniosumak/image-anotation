@@ -10,6 +10,17 @@ export type EditorState = {
   draft: Region | null
 }
 
+/**
+ * The regions as words, one line each, so the coding agent reads the notes as
+ * text rather than off the pixels. A region with nothing written against it is
+ * still listed — every number drawn on the image has a line here.
+ */
+function describeRegions(regions: Region[]): string {
+  return regions
+    .map((region) => `${region.number}. ${region.note || '(no note)'}`)
+    .join('\n')
+}
+
 function boundsBetween(from: Point, to: Point): Bounds {
   return {
     x: Math.min(from.x, to.x),
@@ -52,9 +63,13 @@ export function createEditor(capture: Capture) {
         ...state,
         draft: {
           // Only committed regions consume an id, so a cancelled or
-          // never-dragged one doesn't leave a gap in the numbering.
+          // never-dragged one doesn't strand one.
           id: `region-${regionsDrawn + 1}`,
+          // The number it will carry once committed, so the drag shows the
+          // label the developer is about to be writing a note against.
+          number: state.regions.length + 1,
           bounds: boundsBetween(dragOrigin, dragOrigin),
+          note: '',
           source: 'human',
         },
       })
@@ -78,8 +93,25 @@ export function createEditor(capture: Capture) {
       // A click that never became a drag is not a region.
       const drawn = draft.bounds.width > 0 && draft.bounds.height > 0
       if (drawn) regionsDrawn += 1
-      // v1 keeps one region per capture, so a new one replaces the last.
-      setState({ regions: drawn ? [draft] : state.regions, draft: null })
+      setState({
+        regions: drawn ? [...state.regions, draft] : state.regions,
+        draft: null,
+      })
+    },
+
+    /**
+     * Writes what is wrong at a region — the *what* its rectangle can't say.
+     * Writing and editing are the same intent: the note is replaced outright,
+     * so a note can be sharpened without redrawing the region.
+     */
+    annotate(regionId: string, note: string) {
+      if (!state.regions.some((region) => region.id === regionId)) return
+      setState({
+        ...state,
+        regions: state.regions.map((region) =>
+          region.id === regionId ? { ...region, note } : region,
+        ),
+      })
     },
 
     /** Abandons the drag in progress, leaving committed regions untouched. */
@@ -108,8 +140,13 @@ export function createEditor(capture: Capture) {
           width: capture.width,
           height: capture.height,
           capture: { src: capture.src },
-          regions: state.regions.map((region) => ({ bounds: region.bounds })),
+          regions: state.regions.map((region) => ({
+            bounds: region.bounds,
+            number: region.number,
+            note: region.note,
+          })),
         },
+        text: describeRegions(state.regions),
       }
     },
 

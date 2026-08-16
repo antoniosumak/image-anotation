@@ -8,6 +8,12 @@ import type { Capture } from '#/editor/types'
 
 export const Route = createFileRoute('/')({ component: Home })
 
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (target instanceof HTMLInputElement) return true
+  if (target instanceof HTMLTextAreaElement) return true
+  return target instanceof HTMLElement && target.isContentEditable
+}
+
 function Home() {
   const [capture, setCapture] = useState<Capture | null>(null)
   const [pasteError, setPasteError] = useState<string | null>(null)
@@ -15,14 +21,13 @@ function Home() {
 
   useEffect(() => {
     const onPaste = async (event: ClipboardEvent) => {
-      // A paste aimed at somewhere the developer is typing is not a capture.
-      const target = event.target
-      if (target instanceof HTMLElement && target.isContentEditable) return
-      if (target instanceof HTMLInputElement) return
-      if (target instanceof HTMLTextAreaElement) return
-
+      // An image is always a capture — writing a note leaves the cursor in a
+      // text field, and pasting a picture into one meant nothing anyway. A
+      // paste of anything else aimed at somewhere the developer is typing is
+      // theirs to keep.
       const image = imageFromPaste(event.clipboardData)
       if (!image) {
+        if (isTypingTarget(event.target)) return
         setPasteError('That paste carried no image.')
         return
       }

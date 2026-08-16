@@ -23,10 +23,26 @@ export type RegionSource = 'human' | 'model'
 /** A rectangle locating one divergence on the capture. */
 export type Region = {
   id: string
+  /**
+   * What the developer and the coding agent call this region: its 1-based
+   * position on the capture. Distinct from `id`, which is never reused, so a
+   * region can be renumbered without anything losing track of it.
+   */
+  number: number
   bounds: Bounds
+  /** What is wrong here, in the developer's words. Empty until written. */
+  note: string
   source: RegionSource
   /** How sure the source is. Only ever set by a model; unused in v1. */
   confidence?: number
+}
+
+/** One region as the report draws it: where it is, what it is called, what is wrong. */
+export type PlannedRegion = {
+  bounds: Bounds
+  number: number
+  /** Empty when nothing was written — the adapter then draws the number alone. */
+  note: string
 }
 
 /**
@@ -37,10 +53,15 @@ export type RenderPlan = {
   width: number
   height: number
   capture: { src: string }
-  regions: Array<{ bounds: Bounds }>
+  regions: PlannedRegion[]
 }
 
 /** The artifact handed to the coding agent for one implementation capture. */
 export type Report = {
   plan: RenderPlan
+  /**
+   * The same regions and notes as text, for the export path that pastes words
+   * rather than pixels. Numbers match the ones drawn on the image.
+   */
+  text: string
 }
