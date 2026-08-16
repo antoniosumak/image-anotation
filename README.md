@@ -4,8 +4,10 @@ A local, single-developer tool for pointing a coding agent at exactly where its
 UI implementation drifted from the intended design. See `CONTEXT.md` for the
 vocabulary and `docs/adr/` for the decisions behind it.
 
-Nothing is built yet beyond the scaffold — the page it serves exists only to
-prove the stack is wired.
+The path that works today: paste an implementation capture, drag one rectangle
+over what is wrong, and click Copy Image to get the annotated PNG on your
+clipboard. Multiple regions, numbering, notes and the text block are not built
+yet.
 
 ## Running it
 
@@ -25,15 +27,31 @@ npm run test:watch
 npm run typecheck
 ```
 
-Tests are Vitest. Right now there is exactly one, asserting that `cn` resolves
-conflicting Tailwind classes — it exists to prove the harness runs, and it will
-be replaced rather than built on.
+Tests are Vitest, and they cover the editor core in `src/editor/` — the one
+seam that carries value. They drive it with intents and assert on what it
+reports: the committed regions and the contents of the render plan. No canvas
+polyfill, no jsdom, no pixel comparison.
 
-The intended shape, once there is logic to test: cover only the editor core —
-the one seam that carries value — and leave drag ergonomics, canvas
-rasterization, clipboard writes and the server function's filesystem write
-untested, as thin adapters that are cheap to verify by using the app and
-expensive to test meaningfully.
+Drag ergonomics, canvas rasterization and clipboard writes are deliberately
+untested — thin adapters that are cheap to verify by using the app and
+expensive to test in a way that would actually catch anything.
+
+## How it fits together
+
+One seam and a ring of thin adapters around it.
+
+- **`src/editor/`** — the editor core. `createEditor(capture)` takes *intents*
+  (`beginRegion`, `updateRegion`, `commitRegion`) rather than pointer events and
+  never touches the DOM, so a test can drive a whole drag. `buildReport()`
+  returns a **declarative render plan** — what to draw, never pixels.
+- **`src/adapters/`** — the only code that touches browser APIs. `canvas.ts` is
+  the single thing that rasterizes a plan; `clipboard.ts` reads a pasted image
+  and writes the annotated PNG back; `image.ts` decodes a capture's natural size.
+- **`src/components/capture-editor.tsx`** — translates pointer events into
+  intents and draws what the core reports. It holds no region state of its own.
+
+Nothing here resolves a region to code — no CSS selectors, no component names,
+no coordinates standing in for them. See `docs/adr/0001`.
 
 ## The stack
 

@@ -1,19 +1,77 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { useEffect, useRef, useState } from 'react'
 
-import { Button } from '#/components/ui/button'
+import { imageFromPaste } from '#/adapters/clipboard'
+import { loadCapture, releaseCapture } from '#/adapters/image'
+import { CaptureEditor } from '#/components/capture-editor'
+import type { Capture } from '#/editor/types'
 
 export const Route = createFileRoute('/')({ component: Home })
 
 function Home() {
+  const [capture, setCapture] = useState<Capture | null>(null)
+  const [pasteError, setPasteError] = useState<string | null>(null)
+  const previous = useRef<Capture | null>(null)
+
+  useEffect(() => {
+    const onPaste = async (event: ClipboardEvent) => {
+      // A paste aimed at somewhere the developer is typing is not a capture.
+      const target = event.target
+      if (target instanceof HTMLElement && target.isContentEditable) return
+      if (target instanceof HTMLInputElement) return
+      if (target instanceof HTMLTextAreaElement) return
+
+      const image = imageFromPaste(event.clipboardData)
+      if (!image) {
+        setPasteError('That paste carried no image.')
+        return
+      }
+
+      event.preventDefault()
+      try {
+        const next = await loadCapture(image)
+        if (previous.current) releaseCapture(previous.current)
+        previous.current = next
+        setPasteError(null)
+        setCapture(next)
+      } catch {
+        setPasteError('That image could not be read.')
+      }
+    }
+
+    document.addEventListener('paste', onPaste)
+    return () => document.removeEventListener('paste', onPaste)
+  }, [])
+
+  // Only on unmount — the paste handler releases each capture it replaces.
+  useEffect(() => () => {
+    if (previous.current) releaseCapture(previous.current)
+  }, [])
+
   return (
-    <main className="mx-auto flex max-w-2xl flex-col items-start gap-4 p-8">
-      <h1 className="text-3xl font-semibold tracking-tight">
-        UI Divergence Feedback
-      </h1>
-      <p className="text-muted-foreground">
-        Nothing is wired up yet. This page exists to prove the stack renders.
-      </p>
-      <Button>Scaffold works</Button>
+    <main className="flex flex-col items-start gap-6 p-8">
+      <header className="flex flex-col gap-1">
+        <h1 className="text-3xl font-semibold tracking-tight">
+          UI Divergence Feedback
+        </h1>
+        <p className="text-muted-foreground">
+          Paste an implementation capture, drag a rectangle over what is wrong,
+          and copy the annotated image for your coding agent.
+        </p>
+      </header>
+
+      {pasteError ? (
+        <p className="text-destructive text-sm">{pasteError}</p>
+      ) : null}
+
+      {capture ? (
+        <CaptureEditor key={capture.src} capture={capture} />
+      ) : (
+        <div className="text-muted-foreground flex h-64 w-full max-w-2xl items-center justify-center rounded-lg border border-dashed">
+          Press <kbd className="mx-1 font-mono">Ctrl/Cmd + V</kbd> to paste a
+          capture.
+        </div>
+      )}
     </main>
   )
 }
