@@ -1,7 +1,34 @@
 {
   "name": "ui-divergence-feedback",
-  "private": true,
+  "version": "0.1.0",
+  "description": "Point a coding agent at exactly where its UI drifted from the design. Runs on your machine; nothing is uploaded.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/antoniosumak/image-anotation.git"
+  },
+  "homepage": "https://github.com/antoniosumak/image-anotation#readme",
+  "keywords": [
+    "claude-code",
+    "coding-agent",
+    "screenshot",
+    "annotation",
+    "ui-review"
+  ],
   "type": "module",
+  "bin": {
+    "ui-divergence-feedback": "./bin/ui-divergence.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "CONTEXT.md",
+    "docs/adr"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@10.33.0",
   "imports": {
     "#/*": "./src/*"
   },
@@ -10,40 +37,43 @@
     "generate-routes": "tsr generate",
     "build": "vite build",
     "preview": "vite preview",
+    "start": "node ./bin/ui-divergence.js",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",
-    "@plerivo/tailwind-config": "^0.1.0",
-    "@plerivo/tokens": "^0.1.0",
     "@plerivo/ui": "^0.2.0",
-    "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-router": "1.170.29",
-    "@tanstack/react-start": "1.168.46",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
     "lucide-react": "^0.577.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "tailwind-merge": "^3.0.2",
-    "tailwindcss": "^4.1.18",
-    "tw-animate-css": "^1.3.6",
+    "srvx": "^0.11.22",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@oxlint/plugins": "1.78.0",
+    "@plerivo/tailwind-config": "^0.1.0",
+    "@plerivo/tokens": "^0.1.0",
+    "@tailwindcss/vite": "^4.1.18",
     "@tanstack/devtools-vite": "0.8.3",
     "@tanstack/react-devtools": "0.10.10",
     "@tanstack/react-router-devtools": "1.167.1",
+    "@tanstack/react-start": "1.168.46",
     "@tanstack/router-cli": "1.167.30",
     "@types/node": "^22.10.2",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^6.0.1",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "oxlint": "1.78.0",
+    "tailwind-merge": "^3.0.2",
+    "tailwindcss": "^4.1.18",
+    "tw-animate-css": "^1.3.6",
     "typescript": "^6.0.2",
     "vite": "^8.0.0",
     "vitest": "^4.1.10"
