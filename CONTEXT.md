@@ -16,6 +16,10 @@ _Avoid_: screenshot (ambiguous — either side is a screenshot), actual, live sh
 One specific, located way an implementation capture differs from its design reference.
 _Avoid_: bug, diff, error, issue, defect
 
+**Region**:
+The rectangle drawn on an implementation capture that locates a divergence. Always a rectangle, because UI elements are rectangles.
+_Avoid_: box, bounding box, selection, marker, annotation
+
 **Coding agent**:
 The AI model that consumes reported divergences and edits the code to resolve them. The tool's only consumer.
 _Avoid_: model, AI, assistant, LLM
