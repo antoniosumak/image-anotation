@@ -11,13 +11,28 @@ export type EditorState = {
 }
 
 /**
- * The regions as words, one line each, so the coding agent reads the notes as
- * text rather than off the pixels. A region with nothing written against it is
- * still listed — every number drawn on the image has a line here.
+ * What was actually written against a region. A note of nothing but whitespace
+ * was never written, and trailing space the developer stopped typing after
+ * shouldn't reach the report.
+ */
+function noteOn(region: Region): string {
+  return region.note.trim()
+}
+
+/**
+ * The regions as words, so the coding agent reads the notes as text rather
+ * than off the pixels. A region nothing was written against is still listed —
+ * every number drawn on the image has an entry here.
  */
 function describeRegions(regions: Region[]): string {
   return regions
-    .map((region) => `${region.number}. ${region.note || '(no note)'}`)
+    .map((region) => {
+      // A note can run to several lines. Indenting the rest of them keeps the
+      // numbers as the only things starting an entry, so a second line can't
+      // read as the next region.
+      const note = noteOn(region).replace(/\n/g, '\n   ') || '(no note)'
+      return `${region.number}. ${note}`
+    })
     .join('\n')
 }
 
@@ -143,7 +158,7 @@ export function createEditor(capture: Capture) {
           regions: state.regions.map((region) => ({
             bounds: region.bounds,
             number: region.number,
-            note: region.note,
+            note: noteOn(region),
           })),
         },
         text: describeRegions(state.regions),

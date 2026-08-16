@@ -25,8 +25,8 @@ export type Region = {
   id: string
   /**
    * What the developer and the coding agent call this region: its 1-based
-   * position on the capture. Distinct from `id`, which is never reused, so a
-   * region can be renumbered without anything losing track of it.
+   * position on the capture, assigned when it is committed. Kept apart from
+   * `id`, which identifies a region rather than naming it.
    */
   number: number
   bounds: Bounds
@@ -60,7 +60,7 @@ export type RenderPlan = {
 export type Report = {
   plan: RenderPlan
   /**
-   * The same regions and notes as text, for the export path that pastes words
+   * The same regions and notes as words, for handing the coding agent text
    * rather than pixels. Numbers match the ones drawn on the image.
    */
   text: string

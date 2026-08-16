@@ -17,6 +17,8 @@ export const LABEL_PADDING_Y = 3
 export const LABEL_RADIUS = 4
 /** How far the label is held off the rectangle it belongs to. */
 export const LABEL_GAP = 4
+/** Height of a label carrying a number alone, as the overlay draws it. */
+export const LABEL_NUMBER_SIZE = 20
 /** Long notes wrap rather than running off the side of the capture. */
 export const LABEL_MAX_WIDTH = 320
 

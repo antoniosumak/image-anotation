@@ -1,5 +1,5 @@
 import { loadImage } from '#/adapters/image'
-import type { PlannedRegion, RenderPlan } from '#/editor/types'
+import type { Bounds, PlannedRegion, RenderPlan } from '#/editor/types'
 import {
   LABEL_BACKGROUND,
   LABEL_FONT,
@@ -78,15 +78,23 @@ function drawLabel(
   const height = lines.length * LABEL_LINE_HEIGHT + LABEL_PADDING_Y * 2
 
   // A region against the edge of the capture would push its label off it.
+  // A region against the edge of the capture would push its label off it.
   const { bounds } = region
   const x = clamp(bounds.x, 0, plan.width - width)
-  const y = clamp(
-    labelSitsAbove(bounds.y, height)
-      ? bounds.y - LABEL_GAP - height
-      : bounds.y + bounds.height + LABEL_GAP,
-    0,
-    plan.height - height,
-  )
+
+  // Above by default, so a label never covers the region it belongs to. With
+  // several regions on one capture it can still land on a *neighbour*, so take
+  // the side that covers fewer of them.
+  const others = plan.regions.filter((other) => other !== region)
+  const above = topFor('above', bounds, height, plan)
+  const below = topFor('below', bounds, height, plan)
+  const preferred = labelSitsAbove(bounds.y, height) ? above : below
+  const alternative = preferred === above ? below : above
+  const y =
+    covered({ x, y: alternative, width, height }, others) <
+    covered({ x, y: preferred, width, height }, others)
+      ? alternative
+      : preferred
 
   context.fillStyle = LABEL_BACKGROUND
   context.beginPath()
@@ -103,29 +111,63 @@ function drawLabel(
   })
 }
 
-/** Breaks a note across lines so a long one stays on the capture. */
+/** Where a label of this height sits if put on the given side of its region. */
+function topFor(
+  side: 'above' | 'below',
+  bounds: Bounds,
+  height: number,
+  plan: RenderPlan,
+): number {
+  const top =
+    side === 'above'
+      ? bounds.y - LABEL_GAP - height
+      : bounds.y + bounds.height + LABEL_GAP
+  return clamp(top, 0, plan.height - height)
+}
+
+/** How many of the other regions this label would be drawn over. */
+function covered(label: Bounds, regions: PlannedRegion[]): number {
+  return regions.filter(
+    ({ bounds }) =>
+      label.x < bounds.x + bounds.width &&
+      label.x + label.width > bounds.x &&
+      label.y < bounds.y + bounds.height &&
+      label.y + label.height > bounds.y,
+  ).length
+}
+
+/**
+ * Breaks a note across lines so a long one stays on the capture. Line breaks
+ * the developer typed are kept — they meant them.
+ */
 function wrapText(
   context: CanvasRenderingContext2D,
   text: string,
   maxWidth: number,
 ): string[] {
   const lines: string[] = []
-  let line = ''
 
-  for (const word of text.split(/\s+/).filter(Boolean)) {
-    const candidate = line ? `${line} ${word}` : word
-    if (line && context.measureText(candidate).width > maxWidth) {
-      lines.push(line)
-      line = word
-    } else {
-      line = candidate
+  for (const paragraph of text.split('\n')) {
+    let line = ''
+    for (const word of paragraph.split(/\s+/).filter(Boolean)) {
+      const candidate = line ? `${line} ${word}` : word
+      if (line && context.measureText(candidate).width > maxWidth) {
+        lines.push(line)
+        line = word
+      } else {
+        line = candidate
+      }
     }
+    lines.push(line)
   }
 
-  lines.push(line)
   return lines
 }
 
+/**
+ * `max` below `min` means the thing being placed is bigger than the room for
+ * it — a label wider than the capture. Pin it to `min` rather than inverting.
+ */
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), Math.max(min, max))
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 
 import { rasterizeReport } from '#/adapters/canvas'
 import { copyImageToClipboard } from '#/adapters/clipboard'
@@ -9,11 +9,13 @@ import type { Capture, Region } from '#/editor/types'
 import {
   LABEL_BACKGROUND,
   LABEL_GAP,
+  LABEL_NUMBER_SIZE,
   LABEL_TEXT_COLOR,
   REGION_STROKE,
   REGION_STROKE_WIDTH,
   labelSitsAbove,
 } from '#/lib/region-style'
+import { cn } from '#/lib/utils'
 
 type CopyState = 'idle' | 'copying' | 'copied' | 'failed'
 
@@ -23,9 +25,6 @@ const COPY_LABEL: Record<CopyState, string> = {
   copied: 'Copied',
   failed: 'Copy failed — try again',
 }
-
-/** Height of the on-screen number badge, and the room it needs above a region. */
-const BADGE_SIZE = 20
 
 /**
  * Drives the editor core from pointer events and draws what it reports. It
@@ -40,14 +39,6 @@ export function CaptureEditor({ capture }: { capture: Capture }) {
     editor.getState,
     editor.getState,
   )
-
-  // A region says where; the note says what — so a freshly drawn one puts the
-  // cursor straight into its note rather than making the developer aim at it.
-  const noteFields = useRef(new Map<string, HTMLTextAreaElement | null>())
-  const newestRegionId = regions.at(-1)?.id
-  useEffect(() => {
-    if (newestRegionId) noteFields.current.get(newestRegionId)?.focus()
-  }, [newestRegionId])
 
   const pointOn = (event: React.PointerEvent<HTMLDivElement>) => {
     const surface = event.currentTarget.getBoundingClientRect()
@@ -114,7 +105,6 @@ export function CaptureEditor({ capture }: { capture: Capture }) {
         <NotePanel
           regions={regions}
           onNoteChange={(regionId, note) => editor.annotate(regionId, note)}
-          fieldRefs={noteFields}
         />
       </div>
     </div>
@@ -122,13 +112,13 @@ export function CaptureEditor({ capture }: { capture: Capture }) {
 }
 
 /**
- * The rectangle and its number. The note itself isn't drawn here — on screen
- * it lives in the panel where it is written, and only the copied image has to
+ * The rectangle and its label. The note itself isn't drawn here — on screen it
+ * lives in the panel where it is written, and only the copied image has to
  * carry it as pixels.
  */
 function RegionOutline({ region }: { region: Region }) {
   const { bounds } = region
-  const badgeAbove = labelSitsAbove(bounds.y, BADGE_SIZE)
+  const labelAbove = labelSitsAbove(bounds.y, LABEL_NUMBER_SIZE)
 
   return (
     <div
@@ -144,32 +134,58 @@ function RegionOutline({ region }: { region: Region }) {
         border: `${REGION_STROKE_WIDTH}px solid ${REGION_STROKE}`,
       }}
     >
-      <span
-        data-slot="region-number"
-        className="absolute flex items-center justify-center rounded px-1.5 text-xs font-semibold"
+      <RegionLabel
+        number={region.number}
+        className="absolute"
         style={{
-          height: BADGE_SIZE,
-          minWidth: BADGE_SIZE,
-          left: -REGION_STROKE_WIDTH,
-          [badgeAbove ? 'bottom' : 'top']: `calc(100% + ${LABEL_GAP}px)`,
-          background: LABEL_BACKGROUND,
-          color: LABEL_TEXT_COLOR,
+          // Flush with the rectangle's left edge, where the canvas puts it.
+          left: 0,
+          [labelAbove ? 'bottom' : 'top']: `calc(100% + ${LABEL_GAP}px)`,
         }}
-      >
-        {region.number}
-      </span>
+      />
     </div>
+  )
+}
+
+/**
+ * What a region is called, wherever it is named — on the capture and again
+ * beside the note written against it.
+ */
+function RegionLabel({
+  number,
+  className,
+  style,
+}: {
+  number: number
+  className?: string
+  style?: React.CSSProperties
+}) {
+  return (
+    <span
+      data-slot="region-label"
+      className={cn(
+        'flex items-center justify-center rounded px-1.5 text-xs font-semibold',
+        className,
+      )}
+      style={{
+        height: LABEL_NUMBER_SIZE,
+        minWidth: LABEL_NUMBER_SIZE,
+        background: LABEL_BACKGROUND,
+        color: LABEL_TEXT_COLOR,
+        ...style,
+      }}
+    >
+      {number}
+    </span>
   )
 }
 
 function NotePanel({
   regions,
   onNoteChange,
-  fieldRefs,
 }: {
   regions: Region[]
   onNoteChange: (regionId: string, note: string) => void
-  fieldRefs: React.RefObject<Map<string, HTMLTextAreaElement | null>>
 }) {
   return (
     <section className="flex w-72 shrink-0 flex-col gap-3">
@@ -183,22 +199,8 @@ function NotePanel({
         <ul className="flex flex-col gap-3">
           {regions.map((region) => (
             <li key={region.id} className="flex items-start gap-2">
-              <span
-                className="mt-1.5 flex items-center justify-center rounded px-1.5 text-xs font-semibold"
-                style={{
-                  height: BADGE_SIZE,
-                  minWidth: BADGE_SIZE,
-                  background: LABEL_BACKGROUND,
-                  color: LABEL_TEXT_COLOR,
-                }}
-              >
-                {region.number}
-              </span>
+              <RegionLabel number={region.number} className="mt-1.5" />
               <Textarea
-                ref={(field) => {
-                  if (field) fieldRefs.current.set(region.id, field)
-                  else fieldRefs.current.delete(region.id)
-                }}
                 value={region.note}
                 onChange={(event) => onNoteChange(region.id, event.target.value)}
                 placeholder="What is wrong here?"

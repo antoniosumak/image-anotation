@@ -21,13 +21,13 @@ function Home() {
 
   useEffect(() => {
     const onPaste = async (event: ClipboardEvent) => {
-      // An image is always a capture — writing a note leaves the cursor in a
-      // text field, and pasting a picture into one meant nothing anyway. A
-      // paste of anything else aimed at somewhere the developer is typing is
-      // theirs to keep.
+      // A paste aimed at somewhere the developer is typing is not a capture.
+      // Notes are typed into text fields, and replacing the capture throws
+      // away every region and note drawn against it.
+      if (isTypingTarget(event.target)) return
+
       const image = imageFromPaste(event.clipboardData)
       if (!image) {
-        if (isTypingTarget(event.target)) return
         setPasteError('That paste carried no image.')
         return
       }

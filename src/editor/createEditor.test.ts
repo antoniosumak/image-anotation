@@ -348,6 +348,40 @@ describe('building a report', () => {
     expect(editor.buildReport().text).toBe('1. (no note)')
   })
 
+  it('keeps a note written over several lines under its own number', () => {
+    const editor = createEditor(capture)
+
+    editor.beginRegion({ x: 10, y: 10 })
+    editor.updateRegion({ x: 50, y: 50 })
+    editor.commitRegion()
+    editor.beginRegion({ x: 100, y: 100 })
+    editor.updateRegion({ x: 140, y: 140 })
+    editor.commitRegion()
+
+    editor.annotate(editor.regions()[0]!.id, 'Padding is wrong\nand so is the gap')
+    editor.annotate(editor.regions()[1]!.id, 'Button sits too low')
+
+    // Every line that starts an entry starts with its number — a second line
+    // of a note can't be mistaken for the next region.
+    expect(editor.buildReport().text).toBe(
+      '1. Padding is wrong\n   and so is the gap\n2. Button sits too low',
+    )
+  })
+
+  it('treats a note of nothing but whitespace as unwritten', () => {
+    const editor = createEditor(capture)
+
+    editor.beginRegion({ x: 10, y: 10 })
+    editor.updateRegion({ x: 50, y: 50 })
+    editor.commitRegion()
+    editor.annotate(editor.regions()[0]!.id, '   ')
+
+    const report = editor.buildReport()
+
+    expect(report.text).toBe('1. (no note)')
+    expect(report.plan.regions[0]?.note).toBe('')
+  })
+
   it('has nothing to say when no region was drawn', () => {
     const editor = createEditor(capture)
 
