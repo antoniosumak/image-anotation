@@ -100,7 +100,10 @@ export function createEditor(capture: Capture) {
   function slidOntoCapture(bounds: Bounds): Bounds {
     return {
       ...bounds,
-      x: Math.min(Math.max(bounds.x, 0), Math.max(capture.width - bounds.width, 0)),
+      x: Math.min(
+        Math.max(bounds.x, 0),
+        Math.max(capture.width - bounds.width, 0),
+      ),
       y: Math.min(
         Math.max(bounds.y, 0),
         Math.max(capture.height - bounds.height, 0),
@@ -118,7 +121,7 @@ export function createEditor(capture: Capture) {
     })
   }
 
-  function regionWith(regionId: string): Region | undefined {
+  function regionById(regionId: string): Region | undefined {
     return state.regions.find((region) => region.id === regionId)
   }
 
@@ -171,7 +174,7 @@ export function createEditor(capture: Capture) {
      * so a note can be sharpened without redrawing the region.
      */
     annotate(regionId: string, note: string) {
-      if (!state.regions.some((region) => region.id === regionId)) return
+      if (!regionById(regionId)) return
       setState({
         ...state,
         regions: state.regions.map((region) =>
@@ -185,7 +188,7 @@ export function createEditor(capture: Capture) {
      * it — which describes the element, not the coordinates — stays put.
      */
     moveRegion(regionId: string, delta: Point) {
-      const region = regionWith(regionId)
+      const region = regionById(regionId)
       if (!region) return
       setBounds(
         regionId,
@@ -198,12 +201,13 @@ export function createEditor(capture: Capture) {
     },
 
     /**
-     * Tightens a region onto the element it points at. Takes the whole
-     * rectangle rather than an edge and a distance: which edge was pulled is
-     * pointer detail, and the bounds are what the region is.
+     * Puts a region at the bounds given — tightening it onto the element it
+     * points at, or putting it back where an abandoned drag found it. Takes
+     * the whole rectangle rather than an edge and a distance: which edge was
+     * pulled is pointer detail, and the bounds are what the region is.
      */
     resizeRegion(regionId: string, bounds: Bounds) {
-      if (!regionWith(regionId)) return
+      if (!regionById(regionId)) return
       const fitted = fittedOntoCapture(bounds)
       // A region pulled shut is a region that locates nothing. Keep the bounds
       // it had rather than leaving something invisible to grab hold of again.
@@ -216,7 +220,7 @@ export function createEditor(capture: Capture) {
      * written against it — the note only ever meant anything at that region.
      */
     removeRegion(regionId: string) {
-      if (!state.regions.some((region) => region.id === regionId)) return
+      if (!regionById(regionId)) return
       setState({
         ...state,
         regions: numbered(

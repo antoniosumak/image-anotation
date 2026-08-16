@@ -155,7 +155,7 @@ export function CaptureEditor({ capture }: { capture: Capture }) {
         <p className="text-muted-foreground text-sm">
           {regions.length === 0
             ? 'Drag a rectangle over what is wrong. Escape abandons a drag.'
-            : 'Drag another rectangle for each divergence, and say what is wrong beside it. Drag a region to move it, or its handles to resize it.'}
+            : 'Drag another rectangle for each divergence, and say what is wrong beside it. Drag a region by its outline to move it, or by a handle to resize it.'}
         </p>
       </div>
 

@@ -20,6 +20,12 @@ export type ResizeHandle = (typeof RESIZE_HANDLES)[number]
 /** How big a handle is drawn, and how wide a target it is to grab. */
 export const HANDLE_SIZE = 10
 
+/**
+ * How far either side of a region's outline still counts as grabbing it. The
+ * drawn stroke alone is too thin to aim at.
+ */
+export const EDGE_GRAB = 10
+
 /** The cursor that says which way a handle pulls. */
 export const HANDLE_CURSOR: Record<ResizeHandle, string> = {
   nw: 'nwse-resize',
@@ -73,14 +79,17 @@ export type Grab =
   | { kind: 'resize'; regionId: string; handle: ResizeHandle }
 
 /**
- * Reads a press as an intent to edit a region: a handle resizes it, anywhere
- * else inside it moves it. Nothing means the press is somewhere free, where a
- * press draws a new region instead.
+ * Reads a press as an intent to edit a region: a handle resizes it, its
+ * outline moves it. Nothing means the press is somewhere free, where it draws
+ * a new region instead.
  *
- * Every handle is tried before any interior, so a region drawn over another
- * can't swallow the corner it overlaps — a handle is a small drawn target the
- * developer aimed at, while an interior is just the space a rectangle encloses.
- * Within each pass the last region drawn wins, because that is the one on top.
+ * Only what is actually drawn can be grabbed. The space a region encloses is
+ * left alone deliberately — a divergence often sits inside another one, and a
+ * region has to stay drawable over the top of one already marked.
+ *
+ * Every handle is tried before any outline, so a region drawn over another
+ * can't swallow the corner it overlaps. Within each pass the last region drawn
+ * wins, because that is the one on top.
  */
 export function grabAt(point: Point, regions: Region[]): Grab | null {
   for (const region of [...regions].reverse()) {
@@ -92,7 +101,7 @@ export function grabAt(point: Point, regions: Region[]): Grab | null {
   }
 
   for (const region of [...regions].reverse()) {
-    if (contains(region.bounds, point)) {
+    if (onOutline(region.bounds, point)) {
       return { kind: 'move', regionId: region.id }
     }
   }
@@ -111,6 +120,25 @@ function within(point: Point, center: Point): boolean {
     Math.abs(point.x - center.x) <= HANDLE_SIZE / 2 &&
     Math.abs(point.y - center.y) <= HANDLE_SIZE / 2
   )
+}
+
+/** On the rectangle's outline: within the grab band, either side of it. */
+function onOutline(bounds: Bounds, point: Point): boolean {
+  const band = EDGE_GRAB / 2
+  return (
+    contains(grown(bounds, band), point) &&
+    !contains(grown(bounds, -band), point)
+  )
+}
+
+/** The same rectangle, `by` further out on every side. */
+function grown(bounds: Bounds, by: number): Bounds {
+  return {
+    x: bounds.x - by,
+    y: bounds.y - by,
+    width: bounds.width + by * 2,
+    height: bounds.height + by * 2,
+  }
 }
 
 function contains(bounds: Bounds, point: Point): boolean {

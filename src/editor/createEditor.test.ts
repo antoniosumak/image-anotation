@@ -9,6 +9,26 @@ const capture: Capture = {
   height: 600,
 }
 
+/** An editor carrying a 40×40 region drawn at each position given. */
+function editorWithRegionsAt(...starts: number[]) {
+  const editor = createEditor(capture)
+  for (const start of starts) {
+    editor.beginRegion({ x: start, y: start })
+    editor.updateRegion({ x: start + 40, y: start + 40 })
+    editor.commitRegion()
+  }
+  return editor
+}
+
+/** An editor carrying one region, big enough to be moved and resized about. */
+function editorWithARegion() {
+  const editor = createEditor(capture)
+  editor.beginRegion({ x: 100, y: 50 })
+  editor.updateRegion({ x: 260, y: 170 })
+  editor.commitRegion()
+  return editor
+}
+
 describe('drawing a region', () => {
   it('commits the dragged rectangle as a region', () => {
     const editor = createEditor(capture)
@@ -220,15 +240,7 @@ describe('drawing a region', () => {
 })
 
 describe('noting what is wrong', () => {
-  function editorWithTwoRegions() {
-    const editor = createEditor(capture)
-    for (const start of [10, 100]) {
-      editor.beginRegion({ x: start, y: start })
-      editor.updateRegion({ x: start + 40, y: start + 40 })
-      editor.commitRegion()
-    }
-    return editor
-  }
+  const editorWithTwoRegions = () => editorWithRegionsAt(10, 100)
 
   it('starts a region with no note — the region says where, not what', () => {
     const editor = editorWithTwoRegions()
@@ -277,14 +289,6 @@ describe('noting what is wrong', () => {
 })
 
 describe('moving a region', () => {
-  function editorWithARegion() {
-    const editor = createEditor(capture)
-    editor.beginRegion({ x: 100, y: 50 })
-    editor.updateRegion({ x: 260, y: 170 })
-    editor.commitRegion()
-    return editor
-  }
-
   it('shifts the region by the distance it was dragged', () => {
     const editor = editorWithARegion()
 
@@ -355,14 +359,6 @@ describe('moving a region', () => {
 })
 
 describe('resizing a region', () => {
-  function editorWithARegion() {
-    const editor = createEditor(capture)
-    editor.beginRegion({ x: 100, y: 50 })
-    editor.updateRegion({ x: 260, y: 170 })
-    editor.commitRegion()
-    return editor
-  }
-
   it('tightens the region onto the bounds it was pulled to', () => {
     const editor = editorWithARegion()
 
@@ -461,15 +457,7 @@ describe('resizing a region', () => {
 })
 
 describe('deleting a region', () => {
-  function editorWithThreeRegions() {
-    const editor = createEditor(capture)
-    for (const start of [10, 100, 200]) {
-      editor.beginRegion({ x: start, y: start })
-      editor.updateRegion({ x: start + 40, y: start + 40 })
-      editor.commitRegion()
-    }
-    return editor
-  }
+  const editorWithThreeRegions = () => editorWithRegionsAt(10, 100, 200)
 
   it('drops the region it names, and the note written against it', () => {
     const editor = editorWithThreeRegions()
