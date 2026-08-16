@@ -47,13 +47,21 @@ import {
 } from '#/lib/region-handles'
 import {
   HANDLE_BORDER,
-  LABEL_BACKGROUND,
-  LABEL_GAP,
-  LABEL_NUMBER_SIZE,
-  LABEL_TEXT_COLOR,
+  PIN_BACKGROUND,
+  PIN_FONT_SIZE,
+  PIN_RING,
+  PIN_RING_WIDTH,
+  PIN_SIZE,
+  PIN_TEXT_COLOR,
+  type PinTip,
   REGION_STROKE,
   REGION_STROKE_WIDTH,
-  labelSitsAbove,
+  SHADOW_BLUR,
+  SHADOW_COLOR,
+  SHADOW_OFFSET_Y,
+  pinBorderRadius,
+  pinSitsAbove,
+  tipFor,
 } from '#/lib/region-style'
 import { cn } from '#/lib/utils'
 
@@ -554,9 +562,9 @@ function ClearCaptureButton({ onClear }: { onClear: () => void }) {
 }
 
 /**
- * The rectangle and its label. The note itself isn't drawn here — on screen it
+ * The rectangle and its pin. The note itself isn't drawn here — on screen it
  * lives in the panel where it is written, and only the copied image has to
- * carry it as pixels.
+ * carry it as pixels, on a card beside the pin.
  *
  * A region is stored in capture pixels and drawn in screen pixels: the bounds
  * are scaled, the stroke and the handles are not. A handle that shrank with an
@@ -581,7 +589,7 @@ function RegionOutline({
     width: region.bounds.width * scale,
     height: region.bounds.height * scale,
   }
-  const labelAbove = labelSitsAbove(drawn.y, LABEL_NUMBER_SIZE)
+  const above = pinSitsAbove(drawn.y)
 
   return (
     <div
@@ -597,13 +605,16 @@ function RegionOutline({
         border: `${REGION_STROKE_WIDTH}px solid ${REGION_STROKE}`,
       }}
     >
-      <RegionLabel
+      <CommentPin
         number={region.number}
-        className="absolute shadow-sm"
+        tip={tipFor(above)}
+        className="absolute"
         style={{
-          // Flush with the rectangle's left edge, where the canvas puts it.
-          left: 0,
-          [labelAbove ? 'bottom' : 'top']: `calc(100% + ${LABEL_GAP}px)`,
+          // The outline's border is drawn inside its bounds, so offsets here
+          // are measured from inside it — pull them back out, so the tip lands
+          // on the corner of the rectangle as drawn rather than 3px into it.
+          left: -REGION_STROKE_WIDTH,
+          [above ? 'bottom' : 'top']: `calc(100% + ${REGION_STROKE_WIDTH}px)`,
         }}
       />
       {committed
@@ -653,30 +664,47 @@ function RegionHandle({
 }
 
 /**
- * What a region is called, wherever it is named — on the capture and again
- * beside the note written against it.
+ * What a region is called, wherever it is named — pointing at the rectangle on
+ * the capture, and again beside the note written against it.
+ *
+ * Shaped like a Figma comment pin, and for the same reason: the capture is a
+ * screenshot of a UI, so anything flat and rectangular drawn on top of it has
+ * to compete with the UI's own flat rectangles. A pin doesn't compete — the
+ * squared-off corner and the collar read as something stuck to the picture.
+ *
+ * No tip is a plain disc, for the notes panel, where there is nothing beside
+ * it to point at.
  */
-function RegionLabel({
+function CommentPin({
   number,
+  tip = null,
   className,
   style,
 }: {
   number: number
+  /** Which corner is squared off, and so which corner does the pointing. */
+  tip?: PinTip | null
   className?: string
   style?: React.CSSProperties
 }) {
   return (
     <span
-      data-slot="region-label"
+      data-slot="comment-pin"
       className={cn(
-        'flex items-center justify-center rounded px-1.5 text-xs font-semibold',
+        'flex shrink-0 items-center justify-center font-semibold tabular-nums',
         className,
       )}
       style={{
-        height: LABEL_NUMBER_SIZE,
-        minWidth: LABEL_NUMBER_SIZE,
-        background: LABEL_BACKGROUND,
-        color: LABEL_TEXT_COLOR,
+        width: PIN_SIZE,
+        height: PIN_SIZE,
+        fontSize: PIN_FONT_SIZE,
+        borderRadius: pinBorderRadius(tip),
+        background: PIN_BACKGROUND,
+        color: PIN_TEXT_COLOR,
+        // The collar and the shadow together are what keep the pin legible
+        // over a capture that may be any colour underneath, including this one.
+        border: `${PIN_RING_WIDTH}px solid ${PIN_RING}`,
+        boxShadow: `0 ${SHADOW_OFFSET_Y}px ${SHADOW_BLUR}px ${SHADOW_COLOR}`,
         ...style,
       }}
     >
@@ -710,7 +738,7 @@ function NotePanel({
               className="group border-border/80 bg-card focus-within:border-ring/60 flex flex-col gap-1.5 rounded-lg border p-2.5 transition-colors"
             >
               <div className="flex items-center gap-2">
-                <RegionLabel number={region.number} />
+                <CommentPin number={region.number} />
                 <Button
                   variant="ghost"
                   size="icon"

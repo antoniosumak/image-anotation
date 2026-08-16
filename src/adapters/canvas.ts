@@ -2,19 +2,42 @@ import { loadImage } from '#/adapters/image'
 import type { Bounds, PlannedRegion, RenderPlan } from '#/editor/types'
 import { REPORT_BACKGROUND } from '#/lib/report-layout'
 import {
-  LABEL_BACKGROUND,
-  LABEL_FONT,
-  LABEL_GAP,
-  LABEL_LINE_HEIGHT,
-  LABEL_MAX_WIDTH,
-  LABEL_PADDING_X,
-  LABEL_PADDING_Y,
-  LABEL_RADIUS,
-  LABEL_TEXT_COLOR,
+  CARD_BACKGROUND,
+  CARD_BORDER,
+  CARD_BORDER_WIDTH,
+  CARD_FONT,
+  CARD_LINE_HEIGHT,
+  CARD_MAX_WIDTH,
+  CARD_PADDING_X,
+  CARD_PADDING_Y,
+  CARD_RADIUS,
+  CARD_TEXT_COLOR,
+  PIN_BACKGROUND,
+  PIN_FONT,
+  PIN_RING,
+  PIN_RING_WIDTH,
+  PIN_TEXT_COLOR,
+  type PinTip,
   REGION_STROKE,
   REGION_STROKE_WIDTH,
-  labelSitsAbove,
+  SHADOW_BLUR,
+  SHADOW_COLOR,
+  SHADOW_OFFSET_Y,
+  cardBoundsFor,
+  pinBoundsFor,
+  pinCornerRadii,
+  pinSitsAbove,
+  tipFor,
+  unionOf,
 } from '#/lib/region-style'
+
+/** A region's pin and note card, once it is known where they both go. */
+type PlacedComment = {
+  number: number
+  pin: Bounds
+  tip: PinTip
+  card: (Bounds & { lines: string[] }) | null
+}
 
 /**
  * The only thing in the app that turns a plan into pixels. It reads the plan
@@ -65,95 +88,184 @@ export async function rasterizeReport(plan: RenderPlan): Promise<Blob> {
     )
   }
 
-  // Labels go on after every rectangle, so one region's note is never drawn
-  // under a rectangle belonging to another.
-  for (const region of plan.regions) drawLabel(context, region, plan)
+  // Placed for every region before any of them is drawn, so the pass order
+  // below can be decided across the whole capture rather than region by
+  // region.
+  const comments = plan.regions.map((region) => place(context, region, plan))
+
+  // Cards first and pins after, all of them: a card belonging to one region
+  // would otherwise be free to bury the pin of another, and the pins are the
+  // part that has to survive being drawn over.
+  for (const { card } of comments) if (card) drawCard(context, card)
+  for (const comment of comments) drawPin(context, comment)
 
   return toPng(canvas)
 }
 
 /**
- * Draws a region's number, and its note when one was written, on a plate
- * beside the rectangle — the image is pasted on its own, so it has to carry
- * what is wrong as well as where.
+ * Where a region's pin and note card go. The pin points at a corner of the
+ * rectangle from outside it, and the card sits beside the pin — so the report
+ * carries what is wrong as well as where, without either covering the thing
+ * being complained about.
  */
-function drawLabel(
+function place(
   context: CanvasRenderingContext2D,
   region: PlannedRegion,
   plan: RenderPlan,
-) {
-  context.font = LABEL_FONT
-  context.textBaseline = 'top'
-
-  const lines = wrapText(
-    context,
-    region.note ? `${region.number}. ${region.note}` : `${region.number}`,
-    LABEL_MAX_WIDTH,
-  )
-  const width =
-    Math.max(...lines.map((line) => context.measureText(line).width)) +
-    LABEL_PADDING_X * 2
-  const height = lines.length * LABEL_LINE_HEIGHT + LABEL_PADDING_Y * 2
-
-  // A region against the edge of the capture would push its label off it —
-  // and a label is held to the capture, not to the report, so a note never
-  // strays onto the design reference beside it.
+): PlacedComment {
   const { bounds } = region
+  // Held to the capture, not to the report, so a note never strays onto the
+  // design reference beside it.
   const capture = plan.capture.bounds
-  const x = clamp(bounds.x, capture.x, capture.x + capture.width - width)
 
-  // Above by default, so a label never covers the region it belongs to. With
-  // several regions on one capture it can still land on a *neighbour*, so take
-  // the side that covers fewer of them.
+  context.font = CARD_FONT
+  const lines = region.note ? wrapText(context, region.note, CARD_MAX_WIDTH) : []
+  const size = lines.length
+    ? {
+        width:
+          Math.max(...lines.map((line) => context.measureText(line).width)) +
+          CARD_PADDING_X * 2,
+        height: lines.length * CARD_LINE_HEIGHT + CARD_PADDING_Y * 2,
+      }
+    : null
+
+  const sideOf = (above: boolean) => {
+    const tip = tipFor(above)
+    const pin = pinBoundsFor(bounds, tip)
+    const card = size ? cardBoundsFor(pin, tip, size, capture) : null
+    return { number: region.number, pin, tip, card: card && { ...card, lines } }
+  }
+
+  // Above by default. With several regions on one capture a pin can still land
+  // on a *neighbour*, so take the side that covers fewer of them.
+  const preferred = sideOf(pinSitsAbove(bounds.y - capture.y))
+  const alternative = sideOf(preferred.tip !== 'bottom-left')
+  const usable = [preferred, alternative].filter((side) =>
+    fitsOnCapture(side.pin, capture),
+  )
+  // Neither side fits when the capture is barely taller than the region — a
+  // pin half off the top of it still points at the right corner, which is
+  // more use than one moved somewhere it fits.
+  if (usable.length < 2) return usable[0] ?? preferred
+
   const others = plan.regions.filter((other) => other !== region)
-  const above = topFor('above', bounds, height, capture)
-  const below = topFor('below', bounds, height, capture)
-  const preferred = labelSitsAbove(bounds.y, height) ? above : below
-  const alternative = preferred === above ? below : above
-  const y =
-    covered({ x, y: alternative, width, height }, others) <
-    covered({ x, y: preferred, width, height }, others)
-      ? alternative
-      : preferred
-
-  context.fillStyle = LABEL_BACKGROUND
-  context.beginPath()
-  context.roundRect(x, y, width, height, LABEL_RADIUS)
-  context.fill()
-
-  context.fillStyle = LABEL_TEXT_COLOR
-  lines.forEach((line, index) => {
-    context.fillText(
-      line,
-      x + LABEL_PADDING_X,
-      y + LABEL_PADDING_Y + index * LABEL_LINE_HEIGHT,
-    )
-  })
+  return covered(footprintOf(alternative), others) <
+    covered(footprintOf(preferred), others)
+    ? alternative
+    : preferred
 }
 
-/** Where a label of this height sits if put on the given side of its region. */
-function topFor(
-  side: 'above' | 'below',
-  bounds: Bounds,
-  height: number,
-  capture: Bounds,
-): number {
-  const top =
-    side === 'above'
-      ? bounds.y - LABEL_GAP - height
-      : bounds.y + bounds.height + LABEL_GAP
-  return clamp(top, capture.y, capture.y + capture.height - height)
+function footprintOf(comment: PlacedComment): Bounds {
+  return unionOf(comment.pin, comment.card)
 }
 
-/** How many of the other regions this label would be drawn over. */
-function covered(label: Bounds, regions: PlannedRegion[]): number {
+/** Whether a pin is drawn wholly on the capture rather than off the end of it. */
+function fitsOnCapture(pin: Bounds, capture: Bounds): boolean {
+  return pin.y >= capture.y && pin.y + pin.height <= capture.y + capture.height
+}
+
+/** How many of the other regions this footprint would be drawn over. */
+function covered(footprint: Bounds, regions: PlannedRegion[]): number {
   return regions.filter(
     ({ bounds }) =>
-      label.x < bounds.x + bounds.width &&
-      label.x + label.width > bounds.x &&
-      label.y < bounds.y + bounds.height &&
-      label.y + label.height > bounds.y,
+      footprint.x < bounds.x + bounds.width &&
+      footprint.x + footprint.width > bounds.x &&
+      footprint.y < bounds.y + bounds.height &&
+      footprint.y + footprint.height > bounds.y,
   ).length
+}
+
+/**
+ * The pin: a disc with its pointing corner squared off, a white collar and a
+ * shadow. The collar and the shadow are drawn without each other — a shadow
+ * cast by the collar rather than by the pin would ring it in grey.
+ */
+function drawPin(
+  context: CanvasRenderingContext2D,
+  { pin, tip, number }: PlacedComment,
+) {
+  const radii = pinCornerRadii(tip)
+
+  context.save()
+  context.shadowColor = SHADOW_COLOR
+  context.shadowBlur = SHADOW_BLUR
+  context.shadowOffsetY = SHADOW_OFFSET_Y
+  context.fillStyle = PIN_BACKGROUND
+  context.beginPath()
+  context.roundRect(pin.x, pin.y, pin.width, pin.height, radii)
+  context.fill()
+  context.restore()
+
+  context.save()
+  context.strokeStyle = PIN_RING
+  context.lineWidth = PIN_RING_WIDTH
+  context.beginPath()
+  // Inset by half the width, so the collar sits *inside* the pin's bounds as
+  // the overlay's border does — a stroke centred on the path would put the
+  // pin's outer edge half a ring further out here than on screen.
+  const inset = PIN_RING_WIDTH / 2
+  context.roundRect(
+    pin.x + inset,
+    pin.y + inset,
+    pin.width - PIN_RING_WIDTH,
+    pin.height - PIN_RING_WIDTH,
+    radii.map((radius) => (radius > 0 ? radius - inset : 0)),
+  )
+  context.stroke()
+
+  context.font = PIN_FONT
+  context.fillStyle = PIN_TEXT_COLOR
+  context.textAlign = 'center'
+  context.textBaseline = 'middle'
+  // Centred on the whole pin rather than on the disc: the squared corner is
+  // the tip, and a number nudged away from it would read as off-centre.
+  context.fillText(`${number}`, pin.x + pin.width / 2, pin.y + pin.height / 2)
+  context.restore()
+}
+
+/** The note, as Figma draws an open comment: dark text on a white card. */
+function drawCard(
+  context: CanvasRenderingContext2D,
+  card: Bounds & { lines: string[] },
+) {
+  context.save()
+  context.shadowColor = SHADOW_COLOR
+  context.shadowBlur = SHADOW_BLUR
+  context.shadowOffsetY = SHADOW_OFFSET_Y
+  context.fillStyle = CARD_BACKGROUND
+  context.beginPath()
+  context.roundRect(card.x, card.y, card.width, card.height, CARD_RADIUS)
+  context.fill()
+  context.restore()
+
+  context.save()
+  // Inset by half the width, because canvas centres a stroke on its path and
+  // the card's edge is where the white stops.
+  const inset = CARD_BORDER_WIDTH / 2
+  context.strokeStyle = CARD_BORDER
+  context.lineWidth = CARD_BORDER_WIDTH
+  context.beginPath()
+  context.roundRect(
+    card.x + inset,
+    card.y + inset,
+    card.width - CARD_BORDER_WIDTH,
+    card.height - CARD_BORDER_WIDTH,
+    CARD_RADIUS,
+  )
+  context.stroke()
+
+  context.font = CARD_FONT
+  context.fillStyle = CARD_TEXT_COLOR
+  context.textAlign = 'left'
+  context.textBaseline = 'top'
+  card.lines.forEach((line, index) => {
+    context.fillText(
+      line,
+      card.x + CARD_PADDING_X,
+      card.y + CARD_PADDING_Y + index * CARD_LINE_HEIGHT,
+    )
+  })
+  context.restore()
 }
 
 /**
@@ -182,14 +294,6 @@ function wrapText(
   }
 
   return lines
-}
-
-/**
- * `max` below `min` means the thing being placed is bigger than the room for
- * it — a label wider than the capture. Pin it to `min` rather than inverting.
- */
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), Math.max(min, max))
 }
 
 function toPng(canvas: HTMLCanvasElement): Promise<Blob> {

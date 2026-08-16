@@ -20,6 +20,14 @@ _Avoid_: bug, diff, error, issue, defect
 The rectangle drawn on an implementation capture that locates a divergence. Always a rectangle, because UI elements are rectangles.
 _Avoid_: box, bounding box, selection, marker, annotation
 
+**Pin**:
+What names a region wherever the region is shown: a disc carrying its number, with one corner squared off, pointing at the corner of the rectangle it belongs to. Shaped after a Figma comment pin, and for the same reason — see ADR-0003.
+_Avoid_: label, badge, tag, callout
+
+**Note card**:
+The white card carrying a region's note beside its pin on the report image. On screen the note lives in the notes panel instead; the card exists because the image is pasted on its own.
+_Avoid_: tooltip, popover, bubble, balloon
+
 **Report**:
 The single artifact handed to the coding agent for one implementation capture: the annotated capture plus the note for every region on it. One report per capture, never one per divergence.
 _Avoid_: payload, handoff (collides with the `/handoff` skill), prompt, export
