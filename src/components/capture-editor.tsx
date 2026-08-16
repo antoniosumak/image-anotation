@@ -3,6 +3,8 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 
 import { rasterizeReport } from '#/adapters/canvas'
 import { copyImageToClipboard } from '#/adapters/clipboard'
+import { loadImageFile, releaseLoadedImage } from '#/adapters/image'
+import { DesignReferencePanel } from '#/components/design-reference-panel'
 import { Button } from '#/components/ui/button'
 import { Textarea } from '#/components/ui/textarea'
 import { createEditor } from '#/editor/createEditor'
@@ -56,10 +58,38 @@ export function CaptureEditor({ capture }: { capture: Capture }) {
   const [cursor, setCursor] = useState('crosshair')
   const gesture = useRef<Gesture | null>(null)
 
-  const { regions, draft } = useSyncExternalStore(
+  const { regions, draft, designReference } = useSyncExternalStore(
     editor.subscribe,
     editor.getState,
     editor.getState,
+  )
+
+  // The object URL behind the design reference is this component's to release:
+  // the editor core holds the string, and never learns it has been replaced.
+  const attachDesignReference = async (image: Blob) => {
+    const next = await loadImageFile(image)
+    const previous = editor.designReference()
+    editor.attachDesignReference(next)
+    setCopyState('idle')
+    if (previous) releaseLoadedImage(previous)
+  }
+
+  const removeDesignReference = () => {
+    const previous = editor.designReference()
+    editor.removeDesignReference()
+    setCopyState('idle')
+    if (previous) releaseLoadedImage(previous)
+  }
+
+  // On unmount only — attaching and removing release the one they replace.
+  // The editor is remounted when a new capture is pasted, which is what takes
+  // the design reference off with the regions it was attached alongside.
+  useEffect(
+    () => () => {
+      const attached = editor.designReference()
+      if (attached) releaseLoadedImage(attached)
+    },
+    [editor],
   )
 
   const pointOn = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -189,6 +219,12 @@ export function CaptureEditor({ capture }: { capture: Capture }) {
           ))}
           {draft ? <RegionOutline region={draft} committed={false} /> : null}
         </div>
+
+        <DesignReferencePanel
+          designReference={designReference}
+          onAttach={attachDesignReference}
+          onRemove={removeDesignReference}
+        />
 
         <NotePanel
           regions={regions}

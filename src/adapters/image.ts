@@ -1,4 +1,4 @@
-import type { Capture } from '#/editor/types'
+import type { LoadedImage } from '#/editor/types'
 
 export function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -10,13 +10,14 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
 }
 
 /**
- * Turns an image file into a capture, reading its natural size so the app can
- * render it unscaled and the canvas adapter can rasterize at the same size.
+ * Turns a pasted or dropped file into an image the app holds — a capture or a
+ * design reference — reading its natural size so the app can render it unscaled
+ * and the canvas adapter can rasterize at the same size.
  *
  * The returned `src` is an object URL owned by the caller — release it with
- * `releaseCapture` once the capture is replaced.
+ * `releaseLoadedImage` once the image is replaced.
  */
-export async function loadCapture(file: Blob): Promise<Capture> {
+export async function loadImageFile(file: Blob): Promise<LoadedImage> {
   const src = URL.createObjectURL(file)
   try {
     const image = await loadImage(src)
@@ -27,6 +28,6 @@ export async function loadCapture(file: Blob): Promise<Capture> {
   }
 }
 
-export function releaseCapture(capture: Capture) {
-  URL.revokeObjectURL(capture.src)
+export function releaseLoadedImage(image: LoadedImage) {
+  URL.revokeObjectURL(image.src)
 }

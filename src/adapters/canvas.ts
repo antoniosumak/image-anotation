@@ -1,5 +1,6 @@
 import { loadImage } from '#/adapters/image'
 import type { Bounds, PlannedRegion, RenderPlan } from '#/editor/types'
+import { REPORT_BACKGROUND } from '#/lib/report-layout'
 import {
   LABEL_BACKGROUND,
   LABEL_FONT,
@@ -21,7 +22,16 @@ import {
  * editor core.
  */
 export async function rasterizeReport(plan: RenderPlan): Promise<Blob> {
-  const image = await loadImage(plan.capture.src)
+  // Both sides at once: the report is one image, so it is only worth drawing
+  // once both have decoded.
+  const images = await Promise.all(
+    [plan.capture, plan.designReference]
+      .filter((planned) => planned !== null)
+      .map(async (planned) => ({
+        planned,
+        image: await loadImage(planned.src),
+      })),
+  )
 
   const canvas = document.createElement('canvas')
   canvas.width = plan.width
@@ -30,7 +40,15 @@ export async function rasterizeReport(plan: RenderPlan): Promise<Blob> {
   const context = canvas.getContext('2d')
   if (!context) throw new Error('Could not get a 2d canvas context')
 
-  context.drawImage(image, 0, 0, plan.width, plan.height)
+  // Under everything, so the gutter between the two sides — and the ground
+  // beside the shorter of them — isn't left transparent.
+  context.fillStyle = REPORT_BACKGROUND
+  context.fillRect(0, 0, plan.width, plan.height)
+
+  for (const { planned, image } of images) {
+    const { bounds } = planned
+    context.drawImage(image, bounds.x, bounds.y, bounds.width, bounds.height)
+  }
 
   context.strokeStyle = REGION_STROKE
   context.lineWidth = REGION_STROKE_WIDTH
@@ -77,17 +95,19 @@ function drawLabel(
     LABEL_PADDING_X * 2
   const height = lines.length * LABEL_LINE_HEIGHT + LABEL_PADDING_Y * 2
 
-  // A region against the edge of the capture would push its label off it.
-  // A region against the edge of the capture would push its label off it.
+  // A region against the edge of the capture would push its label off it —
+  // and a label is held to the capture, not to the report, so a note never
+  // strays onto the design reference beside it.
   const { bounds } = region
-  const x = clamp(bounds.x, 0, plan.width - width)
+  const capture = plan.capture.bounds
+  const x = clamp(bounds.x, capture.x, capture.x + capture.width - width)
 
   // Above by default, so a label never covers the region it belongs to. With
   // several regions on one capture it can still land on a *neighbour*, so take
   // the side that covers fewer of them.
   const others = plan.regions.filter((other) => other !== region)
-  const above = topFor('above', bounds, height, plan)
-  const below = topFor('below', bounds, height, plan)
+  const above = topFor('above', bounds, height, capture)
+  const below = topFor('below', bounds, height, capture)
   const preferred = labelSitsAbove(bounds.y, height) ? above : below
   const alternative = preferred === above ? below : above
   const y =
@@ -116,13 +136,13 @@ function topFor(
   side: 'above' | 'below',
   bounds: Bounds,
   height: number,
-  plan: RenderPlan,
+  capture: Bounds,
 ): number {
   const top =
     side === 'above'
       ? bounds.y - LABEL_GAP - height
       : bounds.y + bounds.height + LABEL_GAP
-  return clamp(top, 0, plan.height - height)
+  return clamp(top, capture.y, capture.y + capture.height - height)
 }
 
 /** How many of the other regions this label would be drawn over. */

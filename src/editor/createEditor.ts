@@ -1,4 +1,13 @@
-import type { Bounds, Capture, Point, Region, Report } from '#/editor/types'
+import type {
+  Bounds,
+  Capture,
+  DesignReference,
+  Point,
+  Region,
+  RenderPlan,
+  Report,
+} from '#/editor/types'
+import { REPORT_GUTTER } from '#/lib/report-layout'
 
 /**
  * Everything observable about an editor, as one immutable value. Intents
@@ -8,7 +17,17 @@ export type EditorState = {
   regions: Region[]
   /** The region currently being dragged, before it is committed. */
   draft: Region | null
+  /** The design reference attached to the capture, or null when there is none. */
+  designReference: DesignReference | null
 }
+
+/**
+ * Which side of the report is which. The image is pasted on its own as often
+ * as not, but the coding agent gets the text too, and one sentence there beats
+ * captions burned over pixels the developer is asking it to judge.
+ */
+const SIDES =
+  'The implementation capture is on the left, and the design reference it should match is on the right. The numbered regions mark divergences on the implementation capture.'
 
 /**
  * What was actually written against a region. A note of nothing but whitespace
@@ -47,6 +66,54 @@ function numbered(regions: Region[]): Region[] {
   )
 }
 
+/**
+ * Where the two sides of a divergence go on one report image: the capture on
+ * the left at the origin, and the design reference — when there is one — to the
+ * right of it, both at natural size. Neither is scaled, because a report is
+ * read for spacing a few pixels out, and scaling is what hides that.
+ *
+ * The capture staying at the origin is what lets a region's bounds be the same
+ * in capture pixels and in report pixels.
+ */
+function roomForBothSides(
+  capture: Capture,
+  designReference: DesignReference | null,
+): Omit<RenderPlan, 'regions'> {
+  const captureBounds = {
+    x: 0,
+    y: 0,
+    width: capture.width,
+    height: capture.height,
+  }
+
+  if (!designReference) {
+    return {
+      width: capture.width,
+      height: capture.height,
+      capture: { src: capture.src, bounds: captureBounds },
+      designReference: null,
+    }
+  }
+
+  const beside = capture.width + REPORT_GUTTER
+  return {
+    width: beside + designReference.width,
+    height: Math.max(capture.height, designReference.height),
+    capture: { src: capture.src, bounds: captureBounds },
+    designReference: {
+      src: designReference.src,
+      // Top-aligned: both sides show the same screen, so lining their tops up
+      // puts the same element at roughly the same height on each.
+      bounds: {
+        x: beside,
+        y: 0,
+        width: designReference.width,
+        height: designReference.height,
+      },
+    },
+  }
+}
+
 function boundsBetween(from: Point, to: Point): Bounds {
   return {
     x: Math.min(from.x, to.x),
@@ -64,7 +131,7 @@ function boundsBetween(from: Point, to: Point): Bounds {
  * reports rather than drawing them — see ADR-0001 and `buildReport`.
  */
 export function createEditor(capture: Capture) {
-  let state: EditorState = { regions: [], draft: null }
+  let state: EditorState = { regions: [], draft: null, designReference: null }
   let dragOrigin: Point | null = null
   let regionsDrawn = 0
   const listeners = new Set<() => void>()
@@ -163,6 +230,7 @@ export function createEditor(capture: Capture) {
       const drawn = draft.bounds.width > 0 && draft.bounds.height > 0
       if (drawn) regionsDrawn += 1
       setState({
+        ...state,
         regions: drawn ? [...state.regions, draft] : state.regions,
         draft: null,
       })
@@ -236,6 +304,22 @@ export function createEditor(capture: Capture) {
       setState({ ...state, draft: null })
     },
 
+    /**
+     * Puts the intended appearance of the screen beside the capture, so the
+     * coding agent sees both sides. Attaching over one already there replaces
+     * it — the regions and notes belong to the capture, not to it, so they are
+     * left alone.
+     */
+    attachDesignReference(designReference: DesignReference) {
+      setState({ ...state, designReference })
+    },
+
+    /** Takes it back off, returning the capture to having none. */
+    removeDesignReference() {
+      if (!state.designReference) return
+      setState({ ...state, designReference: null })
+    },
+
     regions(): Region[] {
       return state.regions
     },
@@ -244,24 +328,30 @@ export function createEditor(capture: Capture) {
       return state.draft
     },
 
+    designReference(): DesignReference | null {
+      return state.designReference
+    },
+
     /**
      * Describes the report rather than drawing it: the canvas adapter is the
      * only thing that rasterizes. A region still mid-drag is not in the plan —
      * only committed regions are reported.
      */
     buildReport(): Report {
+      const { designReference } = state
       return {
         plan: {
-          width: capture.width,
-          height: capture.height,
-          capture: { src: capture.src },
+          ...roomForBothSides(capture, designReference),
           regions: state.regions.map((region) => ({
             bounds: region.bounds,
             number: region.number,
             note: noteOn(region),
           })),
         },
-        text: describeRegions(state.regions),
+        // Which side is which only needs saying when there are two of them.
+        text: [designReference ? SIDES : '', describeRegions(state.regions)]
+          .filter(Boolean)
+          .join('\n\n'),
       }
     },
 

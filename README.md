@@ -4,10 +4,11 @@ A local, single-developer tool for pointing a coding agent at exactly where its
 UI implementation drifted from the intended design. See `CONTEXT.md` for the
 vocabulary and `docs/adr/` for the decisions behind it.
 
-The path that works today: paste an implementation capture, drag one rectangle
-over what is wrong, and click Copy Image to get the annotated PNG on your
-clipboard. Multiple regions, numbering, notes and the text block are not built
-yet.
+The path that works today: paste or drop an implementation capture, drag a
+rectangle over each thing that is wrong, write a note against each, and click
+Copy Image to get the annotated PNG on your clipboard. Attach a design
+reference beside it — optional, and paste or drop it the same way — and the
+report carries both sides.
 
 ## Running it
 
@@ -45,10 +46,12 @@ One seam and a ring of thin adapters around it.
   never touches the DOM, so a test can drive a whole drag. `buildReport()`
   returns a **declarative render plan** — what to draw, never pixels.
 - **`src/adapters/`** — the only code that touches browser APIs. `canvas.ts` is
-  the single thing that rasterizes a plan; `clipboard.ts` reads a pasted image
-  and writes the annotated PNG back; `image.ts` decodes a capture's natural size.
+  the single thing that rasterizes a plan; `transfer.ts` picks the image out of
+  a paste or a drop; `clipboard.ts` writes the annotated PNG back; `image.ts`
+  decodes an image's natural size.
 - **`src/components/capture-editor.tsx`** — translates pointer events into
-  intents and draws what the core reports. It holds no region state of its own.
+  intents and draws what the core reports. It holds no region state of its own,
+  and owns the object URL behind the design reference the core names.
 
 Nothing here resolves a region to code — no CSS selectors, no component names,
 no coordinates standing in for them. See `docs/adr/0001`.

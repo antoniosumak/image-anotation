@@ -1,12 +1,19 @@
 import { describe, expect, it } from 'vitest'
 
 import { createEditor } from '#/editor/createEditor'
-import type { Capture } from '#/editor/types'
+import type { Capture, DesignReference } from '#/editor/types'
 
 const capture: Capture = {
   src: 'blob:capture',
   width: 800,
   height: 600,
+}
+
+/** Taller and wider than the capture, so the report has to make room for it. */
+const designReference: DesignReference = {
+  src: 'blob:design',
+  width: 900,
+  height: 700,
 }
 
 /** An editor carrying a 40×40 region drawn at each position given. */
@@ -538,7 +545,10 @@ describe('building a report', () => {
 
     expect(plan.width).toBe(800)
     expect(plan.height).toBe(600)
-    expect(plan.capture).toEqual({ src: 'blob:capture' })
+    expect(plan.capture).toEqual({
+      src: 'blob:capture',
+      bounds: { x: 0, y: 0, width: 800, height: 600 },
+    })
   })
 
   it('plans a committed region at the bounds it was drawn at', () => {
@@ -668,6 +678,166 @@ describe('building a report', () => {
     editor.updateRegion({ x: 50, y: 50 })
     editor.commitRegion()
     editor.annotate(editor.regions()[0]!.id, 'Card padding is wrong')
+
+    expect(editor.buildReport()).toEqual(editor.buildReport())
+  })
+
+  it('plans no design reference when none is attached', () => {
+    const editor = editorWithARegion()
+
+    const { plan } = editor.buildReport()
+
+    expect(plan.designReference).toBeNull()
+    expect(plan.width).toBe(800)
+    expect(plan.height).toBe(600)
+  })
+
+  it('says nothing about sides when no design reference is attached', () => {
+    const editor = editorWithARegion()
+    editor.annotate(editor.regions()[0]!.id, 'Card padding is wrong')
+
+    expect(editor.buildReport().text).toBe('1. Card padding is wrong')
+  })
+})
+
+describe('attaching a design reference', () => {
+  it('has none until one is attached', () => {
+    const editor = createEditor(capture)
+
+    expect(editor.designReference()).toBeNull()
+  })
+
+  it('attaches the design reference it is given', () => {
+    const editor = createEditor(capture)
+
+    editor.attachDesignReference(designReference)
+
+    expect(editor.designReference()).toEqual(designReference)
+  })
+
+  it('replaces one attached in error, keeping every region and note', () => {
+    const editor = editorWithARegion()
+    editor.annotate(editor.regions()[0]!.id, 'Card padding is wrong')
+    editor.attachDesignReference(designReference)
+
+    editor.attachDesignReference({
+      src: 'blob:the-right-design',
+      width: 400,
+      height: 300,
+    })
+
+    expect(editor.designReference()?.src).toBe('blob:the-right-design')
+    expect(editor.regions()).toEqual([
+      expect.objectContaining({
+        number: 1,
+        note: 'Card padding is wrong',
+        bounds: { x: 100, y: 50, width: 160, height: 120 },
+      }),
+    ])
+  })
+
+  it('removes it, leaving the capture with none, and the regions untouched', () => {
+    const editor = editorWithARegion()
+    editor.annotate(editor.regions()[0]!.id, 'Card padding is wrong')
+    editor.attachDesignReference(designReference)
+
+    editor.removeDesignReference()
+
+    expect(editor.designReference()).toBeNull()
+    expect(editor.buildReport().text).toBe('1. Card padding is wrong')
+  })
+
+  it('lets regions be drawn with one attached, on the capture as before', () => {
+    const editor = createEditor(capture)
+    editor.attachDesignReference(designReference)
+
+    editor.beginRegion({ x: 100, y: 50 })
+    editor.updateRegion({ x: 260, y: 170 })
+    editor.commitRegion()
+
+    // The design reference is wider and taller than the capture, and a region
+    // still cannot be drawn off the capture and onto it.
+    editor.beginRegion({ x: 700, y: 500 })
+    editor.updateRegion({ x: 1500, y: 1200 })
+    editor.commitRegion()
+
+    expect(editor.regions().map((region) => region.bounds)).toEqual([
+      { x: 100, y: 50, width: 160, height: 120 },
+      { x: 700, y: 500, width: 100, height: 100 },
+    ])
+  })
+})
+
+describe('building a report with a design reference', () => {
+  const editorWithBothSides = () => {
+    const editor = editorWithARegion()
+    editor.annotate(editor.regions()[0]!.id, 'Card padding is wrong')
+    editor.attachDesignReference(designReference)
+    return editor
+  }
+
+  it('plans the design reference beside the capture, at its natural size', () => {
+    const { plan } = editorWithBothSides().buildReport()
+
+    expect(plan.designReference).toEqual({
+      src: 'blob:design',
+      bounds: { x: 824, y: 0, width: 900, height: 700 },
+    })
+  })
+
+  it('makes room for both sides, and for the taller of the two', () => {
+    const { plan } = editorWithBothSides().buildReport()
+
+    expect(plan.width).toBe(1724)
+    expect(plan.height).toBe(700)
+  })
+
+  it('leaves the capture at the origin, so regions stay where they were drawn', () => {
+    const { plan } = editorWithBothSides().buildReport()
+
+    expect(plan.capture).toEqual({
+      src: 'blob:capture',
+      bounds: { x: 0, y: 0, width: 800, height: 600 },
+    })
+    expect(plan.regions).toEqual([
+      {
+        bounds: { x: 100, y: 50, width: 160, height: 120 },
+        number: 1,
+        note: 'Card padding is wrong',
+      },
+    ])
+  })
+
+  it('tells the coding agent which side is which', () => {
+    const text = editorWithBothSides().buildReport().text
+
+    expect(text).toBe(
+      'The implementation capture is on the left, and the design reference it should match is on the right. The numbered regions mark divergences on the implementation capture.\n\n1. Card padding is wrong',
+    )
+  })
+
+  it('still says which side is which with nothing marked up yet', () => {
+    const editor = createEditor(capture)
+    editor.attachDesignReference(designReference)
+
+    expect(editor.buildReport().text).toBe(
+      'The implementation capture is on the left, and the design reference it should match is on the right. The numbered regions mark divergences on the implementation capture.',
+    )
+  })
+
+  it('drops it from the report once it is removed', () => {
+    const editor = editorWithBothSides()
+
+    editor.removeDesignReference()
+
+    const { plan } = editor.buildReport()
+    expect(plan.designReference).toBeNull()
+    expect(plan.width).toBe(800)
+    expect(plan.height).toBe(600)
+  })
+
+  it('builds the same report every time from the same two sides', () => {
+    const editor = editorWithBothSides()
 
     expect(editor.buildReport()).toEqual(editor.buildReport())
   })

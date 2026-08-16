@@ -1,9 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
 
-import { imageFromPaste } from '#/adapters/clipboard'
-import { loadCapture, releaseCapture } from '#/adapters/image'
+import { loadImageFile, releaseLoadedImage } from '#/adapters/image'
+import { imageFromTransfer } from '#/adapters/transfer'
 import { CaptureEditor } from '#/components/capture-editor'
+import { IMAGE_TARGET_ATTRIBUTE } from '#/components/design-reference-panel'
 import type { Capture } from '#/editor/types'
 
 export const Route = createFileRoute('/')({ component: Home })
@@ -14,47 +15,78 @@ function isTypingTarget(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && target.isContentEditable
 }
 
+/**
+ * Whether a paste was aimed at something other than the capture. Somewhere the
+ * developer is typing — notes are text fields — or the design reference, which
+ * takes images of its own. Replacing the capture throws away every region and
+ * note drawn against it, so it only happens when the paste was meant for it.
+ */
+function aimedElsewhere(target: EventTarget | null): boolean {
+  if (isTypingTarget(target)) return true
+  return (
+    target instanceof HTMLElement &&
+    target.closest(`[${IMAGE_TARGET_ATTRIBUTE}]`) !== null
+  )
+}
+
 function Home() {
   const [capture, setCapture] = useState<Capture | null>(null)
-  const [pasteError, setPasteError] = useState<string | null>(null)
+  const [captureError, setCaptureError] = useState<string | null>(null)
   const previous = useRef<Capture | null>(null)
 
-  useEffect(() => {
-    const onPaste = async (event: ClipboardEvent) => {
-      // A paste aimed at somewhere the developer is typing is not a capture.
-      // Notes are typed into text fields, and replacing the capture throws
-      // away every region and note drawn against it.
-      if (isTypingTarget(event.target)) return
+  // Both ways an image arrives end here: a paste and a drop carry the same
+  // thing, and either one replaces the capture.
+  const takeCapture = async (image: Blob) => {
+    try {
+      const next = await loadImageFile(image)
+      if (previous.current) releaseLoadedImage(previous.current)
+      previous.current = next
+      setCaptureError(null)
+      setCapture(next)
+    } catch {
+      setCaptureError('That image could not be read.')
+    }
+  }
 
-      const image = imageFromPaste(event.clipboardData)
+  useEffect(() => {
+    const onPaste = (event: ClipboardEvent) => {
+      if (aimedElsewhere(event.target)) return
+
+      const image = imageFromTransfer(event.clipboardData)
       if (!image) {
-        setPasteError('That paste carried no image.')
+        setCaptureError('That paste carried no image.')
         return
       }
 
       event.preventDefault()
-      try {
-        const next = await loadCapture(image)
-        if (previous.current) releaseCapture(previous.current)
-        previous.current = next
-        setPasteError(null)
-        setCapture(next)
-      } catch {
-        setPasteError('That image could not be read.')
-      }
+      void takeCapture(image)
     }
 
     document.addEventListener('paste', onPaste)
     return () => document.removeEventListener('paste', onPaste)
   }, [])
 
-  // Only on unmount — the paste handler releases each capture it replaces.
+  // Only on unmount — taking a capture releases the one it replaces.
   useEffect(() => () => {
-    if (previous.current) releaseCapture(previous.current)
+    if (previous.current) releaseLoadedImage(previous.current)
   }, [])
 
   return (
-    <main className="flex flex-col items-start gap-6 p-8">
+    // A drop anywhere but the design reference is a capture — the page is one
+    // big target, so a file dragged out of a folder has somewhere to land.
+    <main
+      className="flex flex-col items-start gap-6 p-8"
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={(event) => {
+        event.preventDefault()
+        const image = imageFromTransfer(event.dataTransfer)
+        if (!image) {
+          setCaptureError('That carried no image.')
+          return
+        }
+        void takeCapture(image)
+      }}
+    >
       <header className="flex flex-col gap-1">
         <h1 className="text-3xl font-semibold tracking-tight">
           UI Divergence Feedback
@@ -65,8 +97,8 @@ function Home() {
         </p>
       </header>
 
-      {pasteError ? (
-        <p className="text-destructive text-sm">{pasteError}</p>
+      {captureError ? (
+        <p className="text-destructive text-sm">{captureError}</p>
       ) : null}
 
       {capture ? (
@@ -74,7 +106,7 @@ function Home() {
       ) : (
         <div className="text-muted-foreground flex h-64 w-full max-w-2xl items-center justify-center rounded-lg border border-dashed">
           Press <kbd className="mx-1 font-mono">Ctrl/Cmd + V</kbd> to paste a
-          capture.
+          capture, or drop an image anywhere on the page.
         </div>
       )}
     </main>

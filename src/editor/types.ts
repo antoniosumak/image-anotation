@@ -4,15 +4,26 @@ export type Point = { x: number; y: number }
 /** A rectangle on the implementation capture, in capture pixels. */
 export type Bounds = { x: number; y: number; width: number; height: number }
 
-/** The implementation capture being marked up. */
-export type Capture = {
+/** An image the tool has decoded, and the size it came in at. */
+export type LoadedImage = {
   /** Where the adapter can load the pixels from — an object URL or data URL. */
   src: string
-  /** Natural width in pixels. The capture is never scaled. */
+  /** Natural width in pixels. The image is never scaled. */
   width: number
   /** Natural height in pixels. */
   height: number
 }
+
+/** The implementation capture being marked up. */
+export type Capture = LoadedImage
+
+/**
+ * The intended appearance of the screen the capture was taken of, attached so
+ * the coding agent sees both sides of a divergence. A capture has zero or one:
+ * the tool is fully usable with none, which is the common case when no export
+ * is to hand.
+ */
+export type DesignReference = LoadedImage
 
 /**
  * Who drew a region. Written by the editor and unused in v1 — it exists so
@@ -46,6 +57,12 @@ export type PlannedRegion = {
   note: string
 }
 
+/** An image as the report draws it: where to load it from, and where it goes. */
+export type PlannedImage = {
+  src: string
+  bounds: Bounds
+}
+
 /**
  * What to draw for a report, described rather than drawn. The canvas adapter is
  * the only thing that turns this into pixels — see ADR-0001.
@@ -53,7 +70,14 @@ export type PlannedRegion = {
 export type RenderPlan = {
   width: number
   height: number
-  capture: { src: string }
+  /**
+   * Always at the origin, so a region's bounds are the same in capture pixels
+   * and in report pixels.
+   */
+  capture: PlannedImage
+  /** Beside the capture, or null when none is attached. */
+  designReference: PlannedImage | null
+  /** On the capture only — never on the design reference. */
   regions: PlannedRegion[]
 }
 
