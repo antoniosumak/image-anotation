@@ -1,0 +1,49 @@
+name: Publish
+
+# Every push to main is checked; only a push that changed the version in
+# package.json is published. That keeps the version field as the release
+# switch — no tags to remember, and no failed run on the pushes that are
+# ordinary work rather than a release.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm test
+      - run: pnpm typecheck
+      # Built here rather than left to `prepublishOnly` so a push that isn't a
+      # release still fails loudly when the build is broken.
+      - run: pnpm build
+
+      - id: release
+        name: Is this version already on npm?
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if npm view "ui-divergence-feedback@$version" version > /dev/null 2>&1; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "$version is already published — nothing to do."
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            echo "Publishing $version."
+          fi
+
+      - if: steps.release.outputs.publish == 'true'
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -58,19 +58,47 @@ means asking the clipboard for it, which needs permission on every paste.
 `text/html` is carried by every browser and arrives on the paste event without
 being asked for. Verified round-tripping in Chrome and in Zen.
 
-If you run the app from somewhere other than the project you're marking up, set
-`UI_DIVERGENCE_PROJECT_DIR` to the project's absolute path. Reports are written
-inside it, and it's where the session opens.
+The project a report belongs to is the directory the app was started in, which
+is why it's run as a command from inside that project rather than opened as a
+page. If you do start it somewhere else, set `UI_DIVERGENCE_PROJECT_DIR` to the
+project's absolute path. Reports are written inside it, and it's where the
+session opens.
 
 ## Running it
 
+From the project you're marking up:
+
 ```bash
-npm install
-npm run dev
+npx ui-divergence-feedback
 ```
 
-The app serves on <http://localhost:3000>. It runs entirely on your machine;
-nothing is uploaded and there is no login.
+It serves on <http://localhost:24680> and opens a browser there. Not port 3000
+or 5173 — those belong to the app you're marking up. If 24680 is taken it walks
+up until it finds a free one and says so; `--port` overrides.
+
+Everything runs on your machine: nothing is uploaded, there is no login, and
+the only thing written anywhere is the report, in this project's `reports/`.
+
+## Working on it
+
+```bash
+pnpm install
+pnpm dev
+```
+
+The dev server is on <http://localhost:3000>, and reports land in this repo
+rather than in whatever you're marking up — set `UI_DIVERGENCE_PROJECT_DIR`
+when that isn't what you want.
+
+`pnpm build` then `pnpm start` runs the built app exactly as `npx` users get
+it, which is the one way to check the packaged server rather than the dev one.
+
+## Releasing
+
+Bump `version` in `package.json` and push to `main`. The publish workflow tests,
+typechecks and builds every push, and publishes only when that version isn't on
+npm yet — so the version field is the release switch and an ordinary push is
+never a release. Publishing needs an `NPM_TOKEN` secret on the repository.
 
 ## Testing
 
