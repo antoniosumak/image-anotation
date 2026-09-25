@@ -1,6 +1,6 @@
 """Original 8-bar, 120 BPM loop, synthesized from scratch (royalty-free by construction).
 
-Writes music.wav (16.000 s, seamless loop) and grid.json (measured beat grid).
+Writes music.wav (24.000 s, seamless loop) and grid.json (measured beat grid).
 """
 import json
 import numpy as np
@@ -10,8 +10,8 @@ from scipy.io import wavfile
 SR = 44100
 BPM = 120
 BEAT = 60 / BPM
-BARS = 8
-T = BARS * 4 * BEAT  # 16 s
+BARS = 12
+T = BARS * 4 * BEAT  # 24 s
 TAIL = 3.0
 N = int((T + TAIL) * SR)
 rng = np.random.default_rng(7)
@@ -94,7 +94,8 @@ add(filt(rng.standard_normal(int(1.6 * SR)), "highpass", 4000) * np.exp(-tt(1.6)
 add(filt(rng.standard_normal(int(1.6 * SR)), "highpass", 4000) * np.exp(-tt(1.6) * 3) * 0.08, T)
 
 # ---- harmony ---------------------------------------------------------------
-# Fmaj9 | Am7 | Dm9 | Bbmaj9 (two bars each)
+# Fmaj9 | Am7 | Dm9 | Bbmaj9 | Dm9 | Bbmaj9 (two bars each): the last two
+# repeat as a vamp under the send, and Bb back to F resolves the loop
 CHORDS = [
     (41, [57, 60, 64, 67]),  # F  : A C E G
     (45, [55, 60, 64, 67]),  # Am : G C E (+G)
@@ -149,7 +150,10 @@ def pluck(m, dur=0.3):
     return x * 0.05
 
 
-for ci, (root, notes) in enumerate(CHORDS):
+PROG = [0, 1, 2, 3, 2, 3]
+assert len(PROG) * 2 == BARS
+for ci, chord in enumerate(PROG):
+    root, notes = CHORDS[chord]
     bar0 = ci * 2
     t0 = bar0 * 4 * BEAT
     add(pad(notes, t0, 8 * BEAT), t0, 1.0)

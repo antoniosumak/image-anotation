@@ -113,7 +113,8 @@ html, body { margin: 0; background: var(--stage); }
  * Everything on screen is a pure function of t. seek(t) computes every style
  * from scratch: no transitions, no timers, nothing carried between frames.
  * ========================================================================= */
-const T = 16;               // 8 bars at 120 BPM
+const T = 24;               // 12 bars at 120 BPM
+window.DURATION = T;
 const BEAT = 0.5;
 
 /* ---------- springs: closed-form step responses ---------- */
@@ -206,8 +207,11 @@ const TL = {
     { down: 7.5, up: 8.0, pin: 8.25, open: 8.5, type: 8.75 },
   ],
   cps: 34,
-  design: 10.5, fold: 10.9, toButton: 11.6, click: 12.0, sending: 12.05, sent: 12.5,
-  terminal: 13.0, enter: 14.0, back: 14.5, fixes: [14.75, 15.0, 15.25], collapse: 15.5,
+  // after the last note, every step gets room to be read before the next one:
+  // the report is held long enough to take in its notes and both halves, the
+  // prompt sits waiting in the terminal, and each fix lands on its own
+  design: 11.0, fold: 12.25, toButton: 15.0, click: 16.0, sending: 16.05, sent: 17.0,
+  terminal: 18.0, enter: 20.0, back: 20.75, fixes: [21.25, 21.75, 22.25], collapse: 23.0,
 };
 
 /* ---------- world geometry ---------- */
@@ -405,11 +409,11 @@ function cursorEvents() {
     [TL.drags[1].down, r[1].b, 21, 12.5],
     [6.1, r[2].a],
     [TL.drags[2].down, r[2].b, 17, 10.5],
-    [10.2, [1040, 880]],
-    [11.45, [770, 728]],
-    [12.3, [930, 860]],
-    [13.4, [735, 1124]],
-    [14.35, P0],
+    [10.3, [1040, 1010]],                    // out of the way, below the report
+    [TL.toButton + 0.35, [770, 728]],       // sets off once the button has formed
+    [TL.click + 0.3, [930, 860]],
+    [TL.terminal + 0.4, [735, 1124]],
+    [TL.enter + 0.35, P0],
   ];
   return ev;
 }
@@ -435,11 +439,12 @@ const CAM = [
   [5.75, [1130, 690, Math.log(1.55)]],
   [7.0, [600, 690, Math.log(1.42)]],
   [8.5, [1130, 770, Math.log(1.55)]],
-  [10.5, [720, 720, Math.log(1.0)]],
-  [11.05, [381, 720, Math.log(1.95)]],
-  [11.6, [720, 720, Math.log(2.0)]],
-  [13.0, [720, 730, Math.log(1.14)]],
-  [14.5, [720, 720, Math.log(1.3)]],
+  [10.6, [720, 720, Math.log(1.0)], 7, 1],             // ease back to the whole app
+  [TL.fold + 0.25, [381, 720, Math.log(1.95)], 8, 1],  // read the capture's notes
+  [TL.fold + 1.5, [1059, 720, Math.log(1.95)], 5, 1],  // drift across to the design half
+  [TL.toButton, [720, 720, Math.log(2.0)], 8, 1],
+  [TL.terminal, [720, 730, Math.log(1.14)]],
+  [TL.back, [720, 720, Math.log(1.3)]],
   [TL.collapse, [720, 720, Math.log(1.55)]],
 ];
 
@@ -447,9 +452,10 @@ const CAM = [
 function heroEvents() {
   const bw = M.btnW, B = w => [720 - w / 2, 690, w, 60, 12];
   return [
-    [TL.paste, F1], [TL.design, FR1], [TL.fold, FR2], [TL.toButton, B(bw[0])],
+    // after the last note the shape moves a touch softer, so each change can be followed
+    [TL.paste, F1], [TL.design, FR1, 10, 0.9], [TL.fold, FR2, 10, 0.9], [TL.toButton, B(bw[0]), 10, 0.9],
     [TL.sending + 0.05, B(bw[1])], [TL.sent + 0.06, B(bw[2])],
-    [TL.terminal, FT], [TL.back, FC], [TL.collapse, F0],
+    [TL.terminal, FT, 10, 0.9], [TL.back, FC, 10, 0.9], [TL.collapse, F0, 10, 0.9],
   ];
 }
 // colour: bg rgba, border rgb, border alpha, dash alpha, shadow

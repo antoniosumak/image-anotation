@@ -5,7 +5,7 @@ from scipy.signal import butter, sosfilt
 from scipy.io import wavfile
 
 SR = 44100
-T = 16.0
+T = 24.0  # promo.src.html's loop: 12 bars at 120 BPM
 N = int(T * SR)
 
 

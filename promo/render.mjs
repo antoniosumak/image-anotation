@@ -4,13 +4,15 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 const FF = fs.readFileSync('ff.env', 'utf8').trim().split('=')[1];
 const [w, W] = [Number(process.argv[2] ?? 0), Number(process.argv[3] ?? 1)];
-const FPS = Number(process.argv[4] ?? 60), SUB = Number(process.argv[5] ?? 4), T = 16;
-const N = FPS * T;
-const a = Math.floor((N * w) / W), b = Math.floor((N * (w + 1)) / W);
+const FPS = Number(process.argv[4] ?? 60), SUB = Number(process.argv[5] ?? 4);
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1440 } });
 await page.goto('file://' + process.cwd() + '/promo.html');
 await page.waitForFunction(() => window.READY && window.seek);
+// the loop's length is the page's to say, so a longer promo needs no edit here
+const T = await page.evaluate(() => window.DURATION);
+const N = FPS * T;
+const a = Math.floor((N * w) / W), b = Math.floor((N * (w + 1)) / W);
 const cdp = await page.context().newCDPSession(page);
 const DISK = process.env.DISK === '1';
 fs.mkdirSync(`sub_${w}`, { recursive: true });
