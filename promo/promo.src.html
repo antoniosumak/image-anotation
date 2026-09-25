@@ -1,0 +1,718 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Divergence Promo</title>
+<style>
+@font-face { font-family: Geist; src: url(data:font/woff2;base64,__GEIST__) format('woff2'); font-weight: 100 900; }
+@font-face { font-family: 'Geist Mono'; src: url(data:font/woff2;base64,__GEISTMONO__) format('woff2'); font-weight: 100 900; }
+:root {
+  --stage: #fafafa; --dot: #e5e5e5; --ink: #171717; --muted: #737373; --line: #e5e5e5;
+  --rose: #e11d48; --orange: #d97757; --slate: #0f172a;
+}
+html, body { margin: 0; background: var(--stage); }
+#frame { position: relative; width: 1440px; height: 1440px; overflow: hidden; background: var(--stage);
+  font-family: Geist, sans-serif; color: var(--ink); -webkit-font-smoothing: antialiased; }
+#world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+#grid { position: absolute; left: -3996px; top: -3996px; width: 9900px; height: 9900px; background-color: var(--stage);
+  background-image: radial-gradient(circle at 1px 1px, var(--dot) 1px, transparent 0); background-size: 22px 22px; }
+.a { position: absolute; left: 0; top: 0; box-sizing: border-box; }
+.row { display: flex; align-items: center; }
+
+/* ---------- the one shape ---------- */
+#hero { overflow: hidden; }
+#heroBorder { position: absolute; left: 0; top: 0; overflow: visible; }
+#dropContent { inset: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; text-align: center; width: 600px; height: 340px; }
+.dropIcon { width: 60px; height: 60px; border-radius: 999px; background: #f5f5f5; display: grid; place-items: center; color: #737373; }
+.dropTitle { font-size: 21px; font-weight: 500; letter-spacing: -0.01em; }
+.dropHint { font-size: 17px; color: var(--muted); line-height: 1.6; max-width: 400px; }
+.kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 6px; margin: 0 1px;
+  border-radius: 5px; background: #f5f5f5; color: #525252; font-size: 14px; font-weight: 500; vertical-align: 1px; box-sizing: border-box; }
+
+/* ---------- the capture (Northwind, drawn at its own 1280 x 820 pixels) ---------- */
+.cap { width: 1280px; height: 820px; background: #fff; transform-origin: 0 0; font-family: Geist, sans-serif; color: #0f172a; }
+.cap * { box-sizing: border-box; }
+.nw-side { left: 0; top: 0; width: 232px; height: 820px; background: #fbfbfc; border-right: 1px solid #eceef2; }
+.nw-logo { left: 24px; top: 22px; width: 24px; height: 24px; border-radius: 7px; background: #4f46e5; }
+.nw-brand { left: 58px; top: 22px; font-size: 15px; font-weight: 600; line-height: 24px; }
+.nw-nav { left: 14px; width: 204px; height: 34px; border-radius: 8px; padding-left: 14px; font-size: 13.5px; line-height: 34px; color: #64748b; }
+.nw-nav.on { background: #eef2ff; color: #4338ca; font-weight: 600; }
+.nw-top { left: 232px; top: 0; width: 1048px; height: 64px; border-bottom: 1px solid #eceef2; }
+.nw-search { left: 268px; top: 14px; width: 360px; height: 36px; border-radius: 8px; background: #f1f5f9; color: #94a3b8; font-size: 13px; line-height: 36px; padding-left: 14px; }
+.nw-btn { border-radius: 8px; background: #4f46e5; color: #fff; font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: center; white-space: nowrap; }
+.nw-h { left: 268px; white-space: nowrap; letter-spacing: -0.01em; }
+.nw-sub { left: 268px; font-size: 13px; color: #64748b; white-space: nowrap; }
+.nw-stat { top: 158px; width: 316px; height: 104px; border: 1px solid #e8eaee; border-radius: 12px; background: #fff; }
+.nw-stat .l { left: 20px; top: 16px; font-size: 12px; color: #64748b; }
+.nw-stat .v { left: 20px; top: 36px; font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
+.nw-stat .d { left: 20px; top: 76px; font-size: 12px; font-weight: 600; }
+.nw-th { top: 296px; font-size: 11px; font-weight: 600; color: #64748b; letter-spacing: 0.06em; line-height: 28px; white-space: nowrap; }
+.nw-rule { left: 268px; width: 980px; height: 1px; background: #e8eaee; }
+.nw-tr { left: 268px; width: 980px; border-bottom: 1px solid #f0f1f4; }
+.nw-tr.alt { background: #fafbfc; }
+.nw-td { font-size: 13px; white-space: nowrap; top: 50%; transform: translateY(-50%); }
+
+/* regions, pins, cards: all in capture pixels */
+.region { border: 3px solid var(--rose); }
+.handle { width: 11px; height: 11px; background: var(--rose); border: 1.5px solid #fff; margin: -5.5px 0 0 -5.5px; }
+.pin { width: 40px; height: 40px; background: var(--rose); color: #fff; border: 2.5px solid #fff; box-shadow: 0 2px 8px rgba(15,23,42,.35);
+  display: grid; place-items: center; font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rcard { background: #fff; color: #0f172a; border: 1px solid rgba(15,23,42,.12); border-radius: 12px; box-shadow: 0 2px 10px rgba(15,23,42,.16);
+  font-size: 20px; line-height: 28px; font-weight: 500; padding: 12px 16px; max-width: 360px; width: max-content; }
+.band { left: 1280px; top: 0; width: 24px; height: 820px; background: #e5e5e5; }
+
+/* ---------- design reference ---------- */
+#design { overflow: hidden; background: #fff; }
+.label { font-size: 15px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+
+/* ---------- divergences panel ---------- */
+#panel { width: 410px; height: 590.4px; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+.badge { display: inline-grid; place-items: center; min-width: 24px; height: 22px; padding: 0 7px; border-radius: 6px; background: #f5f5f5; color: #525252;
+  font-size: 13px; font-weight: 500; letter-spacing: 0; margin-left: 10px; box-sizing: border-box; }
+.empty { font-size: 15px; line-height: 1.6; color: var(--muted); }
+.ncard { overflow: hidden; }
+.ndisc { width: 32px; height: 32px; border-radius: 999px; background: var(--rose); color: #fff; border: 2px solid #fff; box-shadow: 0 1px 5px rgba(15,23,42,.3);
+  display: grid; place-items: center; font-size: 15px; font-weight: 700; box-sizing: border-box; }
+.ntext { font-size: 18px; line-height: 26px; color: #0f172a; font-weight: 450; width: 346px; white-space: pre-wrap; }
+.ph { color: #a3a3a3; }
+.caret { display: inline-block; width: 2px; height: 22px; background: #171717; vertical-align: -4px; margin-left: 1px; }
+
+/* ---------- keycaps ---------- */
+.key { background: #fff; border: 1px solid #e5e5e5; border-bottom-width: 4px; border-bottom-color: #d4d4d4; border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.05); display: flex; align-items: center; justify-content: center; gap: 10px; color: #404040;
+  font-size: 32px; font-weight: 500; }
+
+/* ---------- send button + terminal (content that lives inside the one shape) ---------- */
+#btnContent { inset: 0; width: 100%; height: 100%; }
+.blabel { color: #fff; font-size: 20px; font-weight: 500; white-space: nowrap; letter-spacing: -0.005em; }
+#termContent { width: 1100px; height: 680px; font-family: 'Geist Mono', monospace; color: #e5e5e5; }
+.tbar { left: 0; top: 0; width: 1100px; height: 44px; border-bottom: 1px solid #2a2a2a; background: #1f1f1f; }
+.tdot { top: 16px; width: 12px; height: 12px; border-radius: 99px; background: #404040; }
+.ttitle { left: 0; width: 1100px; top: 0; line-height: 44px; text-align: center; font-size: 14px; color: #a3a3a3; }
+.welcome { left: 28px; top: 70px; width: 560px; border: 1px solid var(--orange); border-radius: 8px; padding: 14px 20px; font-size: 15px; line-height: 23px; }
+.inputbox { left: 28px; width: 1044px; border: 1px solid #525252; border-radius: 8px; padding: 14px 18px 14px 44px; font-size: 16px; line-height: 24px; white-space: pre-wrap; }
+.tcaret { display: inline-block; width: 9.6px; height: 20px; background: #e5e5e5; vertical-align: -4px; }
+
+#cursor { position: absolute; left: 0; top: 0; width: 32px; height: 40px; transform-origin: 4px 3px; }
+</style>
+</head>
+<body>
+<div id="frame">
+  <div id="world">
+    <div id="grid"></div>
+  </div>
+  <svg id="cursor" viewBox="0 0 32 40">
+    <defs><filter id="cs" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="1.5" stdDeviation="1.6" flood-color="#000" flood-opacity=".3"/></filter></defs>
+    <path filter="url(#cs)" d="M4 3 L4 31 L11.2 24.4 L16 35.2 L20.6 33.2 L15.8 22.6 L25.4 22.6 Z" fill="#111" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>
+  </svg>
+</div>
+
+<script>
+'use strict';
+/* =========================================================================
+ * Everything on screen is a pure function of t. seek(t) computes every style
+ * from scratch: no transitions, no timers, nothing carried between frames.
+ * ========================================================================= */
+const T = 16;               // 8 bars at 120 BPM
+const BEAT = 0.5;
+
+/* ---------- springs: closed-form step responses ---------- */
+function S(x, w, z) {
+  if (x <= 0) return 0;
+  const e = Math.exp(-z * w * x);
+  if (z >= 1) return 1 - (1 + w * x) * e;
+  const wd = w * Math.sqrt(1 - z * z);
+  return 1 - e * (Math.cos(wd * x) + (z * w / wd) * Math.sin(wd * x));
+}
+/* A value that changes target many times is the sum of one spring per change.
+ * Each change also contributes from one loop earlier (t + T), so the value is
+ * periodic in T and the last frame is the first. evs: [[time, target, w?, z?]] */
+function track(t, evs, w = 13, z = 0.86) {
+  let prev = evs[evs.length - 1][1];
+  let v = prev;
+  for (const e of evs) {
+    const d = e[1] - prev; prev = e[1];
+    if (d === 0) continue;
+    const ww = e[2] ?? w, zz = e[3] ?? z;
+    v += d * (S(t - e[0], ww, zz) + S(t - e[0] + T, ww, zz) - 1);
+  }
+  return v;
+}
+/* vector version: evs [[time, [a,b,c..], w?, z?]] */
+function trackV(t, evs, w, z) {
+  const n = evs[0][1].length, out = [];
+  for (let i = 0; i < n; i++) out.push(track(t, evs.map(e => [e[0], e[1][i], e[2], e[3]]), w, z));
+  return out;
+}
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, p) => a + (b - a) * p;
+const easeOut = x => { x = clamp(x, 0, 1); return 1 - Math.pow(1 - x, 3); };
+const easeIO = x => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
+/* enter over [a, a+da], exit over [b, b+db] */
+const win = (t, a, da, b, db) => Math.min(easeOut((t - a) / da), 1 - easeIO((t - b) / db));
+/* for layers whose window wraps across the loop point */
+const wrap = (t, pivot) => (t < pivot ? t + T : t);
+
+function css(el, o) { for (const k in o) el.style[k] = o[k]; }
+function show(el, o, blur = 8, extra = '') {
+  el.style.opacity = o;
+  el.style.visibility = o <= 0.002 ? 'hidden' : 'visible';
+  const b = (1 - o) * blur;
+  el.style.filter = b > 0.05 ? `blur(${b.toFixed(2)}px)` : 'none';
+}
+function h(tag, cls, parent, html) {
+  const el = document.createElement(tag);
+  if (cls) el.className = cls;
+  if (html != null) el.innerHTML = html;
+  if (parent) parent.appendChild(el);
+  return el;
+}
+const box = (el, x, y, w, hh) => css(el, { left: x + 'px', top: y + 'px', width: w + 'px', height: hh + 'px' });
+
+/* ---------- icons: lucide, one stroke width everywhere ---------- */
+const ICON = (d, s = 28) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const IMAGE_PLUS = '<path d="M16 5h6"/><path d="M19 2v6"/><path d="M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/><circle cx="9" cy="9" r="2"/>';
+const COMMAND = '<path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3"/>';
+const ENTER = '<polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/>';
+const CLAUDE = s => `<svg width="${s}" height="${s}" viewBox="0 0 16 16" fill="currentColor"><path d="m3.127 10.604 3.135-1.76.053-.153-.053-.085H6.11l-.525-.032-1.791-.048-1.554-.065-1.505-.08-.38-.081L0 7.832l.036-.234.32-.214.455.04 1.009.069 1.513.105 1.097.064 1.626.17h.259l.036-.105-.089-.065-.068-.064-1.566-1.062-1.695-1.121-.887-.646-.48-.327-.243-.306-.104-.67.435-.48.585.04.15.04.593.456 1.267.981 1.654 1.218.242.202.097-.068.012-.049-.109-.181-.9-1.626-.96-1.655-.428-.686-.113-.411a2 2 0 0 1-.068-.484l.496-.674L4.446 0l.662.089.279.242.411.94.666 1.48 1.033 2.014.302.597.162.553.06.17h.105v-.097l.085-1.134.157-1.392.154-1.792.052-.504.25-.605.497-.327.387.186.319.456-.045.294-.19 1.23-.37 1.93-.243 1.29h.142l.161-.16.654-.868 1.097-1.372.484-.545.565-.601.363-.287h.686l.505.751-.226.775-.707.895-.585.759-.839 1.13-.524.904.048.072.125-.012 1.897-.403 1.024-.186 1.223-.21.553.258.06.263-.218.536-1.307.323-1.533.307-2.284.54-.028.02.032.04 1.029.098.44.024h1.077l2.005.15.525.346.315.424-.053.323-.807.411-3.631-.863-.872-.218h-.12v.073l.726.71 1.331 1.202 1.667 1.55.084.383-.214.302-.226-.032-1.464-1.101-.565-.497-1.28-1.077h-.084v.113l.295.432 1.557 2.34.08.718-.112.234-.404.141-.444-.08-.911-1.28-.94-1.44-.759-1.291-.093.053-.448 4.821-.21.246-.484.186-.403-.307-.214-.496.214-.98.258-1.28.21-1.016.19-1.263.112-.42-.008-.028-.092.012-.953 1.307-1.448 1.957-1.146 1.227-.274.109-.477-.247.045-.44.266-.39 1.586-2.018.956-1.25.617-.723-.004-.105h-.036l-4.212 2.736-.75.096-.324-.302.04-.496.154-.162 1.267-.871z"/></svg>`;
+
+/* =========================================================================
+ * Copy: the product's own words.
+ * ========================================================================= */
+const NOTES = [
+  'Button should be 36px tall, not 44px',
+  'Heading should be 28px bold, not 20px semibold',
+  'Rows should be 56px, due date right-aligned',
+];
+const REPORT_PATH = '/Users/dev/northwind/reports/report-2026-09-25T10-14-02.png';
+const PROMPT = [
+  `Read the report image at ${REPORT_PATH}. It is a capture of this project's UI as currently built, with numbered regions drawn on it — each one marks somewhere the implementation diverges from its intended design, and carries the note written against it on a card beside its pin.`,
+  'Work out which code produces each numbered region and change it so the implementation matches. Ask me before making a change I have not asked for.',
+  'The implementation capture is on the left, and the design reference it should match is on the right. The numbered regions mark divergences on the implementation capture.',
+  NOTES.map((n, i) => `${i + 1}. ${n}`).join('\n'),
+].join('\n\n');
+const SEND = ['Send to Claude Code', 'Sending…', 'Sent'];
+
+/* =========================================================================
+ * Timeline (seconds; one beat = 0.5 s)
+ * ========================================================================= */
+const TL = {
+  cmdDown: 0.5, vDown: 1.0, paste: 1.0,
+  drags: [ // mouse down, release, pin snap, card opens, typing starts
+    { down: 2.0, up: 2.5, pin: 2.75, open: 3.0, type: 3.25 },
+    { down: 5.0, up: 5.5, pin: 5.75, open: 6.0, type: 6.25 },
+    { down: 8.0, up: 8.5, pin: 8.75, open: 9.0, type: 9.25 },
+  ],
+  cps: 34,
+  design: 10.5, fold: 10.9, toButton: 11.6, click: 12.0, sending: 12.05, sent: 12.5,
+  terminal: 13.0, enter: 14.0, back: 14.5, fixes: [14.75, 15.0, 15.25], collapse: 15.5,
+};
+
+/* ---------- world geometry ---------- */
+const F0 = [420, 550, 600, 340, 16];                 // the dashed drop target
+const K1 = 0.72, K2 = 0.52;                          // capture scale: editing, report
+const F1 = [40, 425, 1280 * K1, 820 * K1, 12];       // capture, beside the panel
+const FC = [720 - 640 * K1, 425, 1280 * K1, 820 * K1, 12]; // capture, centred
+const REP_W = 2584 * K2, REP_H = 820 * K2;
+const FR1 = [48, 720 - REP_H / 2, 1280 * K2, REP_H, 10];
+const FR2 = [48, 720 - REP_H / 2, REP_W, REP_H, 4];
+const FT = [170, 380, 1100, 680, 14];
+const PANEL = [990, 425, 410, 820 * K1];
+const SLOT = i => [PANEL[0] + 16, PANEL[1] + 60 + i * 134, 378, 122];
+
+/* ---------- capture (native px) ---------- */
+const PS = 40, CARD_GAP = 8;
+const NAV = ['Overview', 'Revenue', 'Customers', 'Invoices', 'Products', 'Settings'];
+const ROWS = [
+  ['INV-2041', 'Halcyon Foods', '$12,400', '18 Aug 2026'],
+  ['INV-2040', 'Peregrine Ltd', '$8,250', '17 Aug 2026'],
+  ['INV-2039', 'Marlow & Sons', '$21,900', '15 Aug 2026'],
+  ['INV-2038', 'Kestrel Design', '$4,120', '14 Aug 2026'],
+  ['INV-2037', 'Ardent Systems', '$16,780', '12 Aug 2026'],
+  ['INV-2036', 'Thornbury Co.', '$9,340', '11 Aug 2026'],
+];
+const STATS = [['Gross revenue', '$412,900', '+12.4%', '#16a34a'], ['Open invoices', '38', '−4.1%', '#dc2626'], ['Avg. days to pay', '21.5', '+2.0%', '#16a34a']];
+
+/* One Northwind screen. apply(p) moves it from the implementation (0) to the
+ * design (1), one divergence at a time. */
+function northwind(parent) {
+  const root = h('div', 'a cap', parent);
+  h('div', 'a nw-side', root);
+  h('div', 'a nw-logo', root);
+  h('div', 'a nw-brand', root, 'Northwind');
+  NAV.forEach((n, i) => { const e = h('div', 'a nw-nav' + (i === 1 ? ' on' : ''), root, n); e.style.top = 84 + i * 40 + 'px'; });
+  h('div', 'a nw-top', root);
+  h('div', 'a nw-search', root, 'Search invoices…');
+  const btn = h('div', 'a nw-btn', root, 'New invoice');
+  const head = h('div', 'a nw-h', root, 'Revenue overview');
+  const sub = h('div', 'a nw-sub', root, 'Last 30 days compared with the previous period');
+  STATS.forEach((s, i) => {
+    const c = h('div', 'a nw-stat', root); c.style.left = 268 + i * 332 + 'px';
+    h('div', 'a l', c, s[0]); h('div', 'a v', c, s[1]);
+    const d = h('div', 'a d', c, s[2]); d.style.color = s[3];
+  });
+  const th = ['Invoice', 'Customer', 'Amount'].map((l, i) => { const e = h('div', 'a nw-th', root, l.toUpperCase()); e.style.left = [276, 420, 700][i] + 'px'; return e; });
+  const thDue = h('div', 'a nw-th', root, 'DUE');
+  const rule = h('div', 'a nw-rule', root); rule.style.top = '324px';
+  const rows = ROWS.map((r, i) => {
+    const tr = h('div', 'a nw-tr' + (i % 2 ? ' alt' : ''), root);
+    const tds = r.map((c, j) => {
+      const td = h('div', 'a nw-td', tr, c);
+      td.style.left = [8, 152, 432, 632][j] + 'px';
+      td.style.color = ['#0f172a', '#334155', '#0f172a', '#64748b'][j];
+      if (j === 0) td.style.fontWeight = 500;
+      return td;
+    });
+    return { tr, due: tds[3] };
+  });
+  let dueW = 0, thDueW = 0;
+  const api = {
+    root, head,
+    measure() { dueW = rows[0].due.offsetWidth; thDueW = thDue.offsetWidth; },
+    apply(p1, p2, p3) {
+      // 1. button: 44px tall, flush to the edge -> 36px, inset like the design
+      box(btn, lerp(1132, 1120, p1), lerp(10, 14, p1), lerp(140, 128, p1), lerp(44, 36, p1));
+      // 2. heading: 20px semibold -> 28px bold
+      const fs = lerp(20, 28, p2);
+      css(head, { top: lerp(88, 84, p2) + 'px', fontSize: fs + 'px', fontWeight: Math.round(lerp(600, 700, p2)), lineHeight: fs * 1.3 + 'px' });
+      sub.style.top = lerp(88, 84, p2) + fs * 1.3 + 4 + 'px';
+      // 3. rows: 44px -> 56px, due date left -> right aligned
+      const rh = lerp(44, 56, p3);
+      rows.forEach((r, i) => {
+        css(r.tr, { top: 324 + i * rh + 'px', height: rh + 'px' });
+        r.due.style.left = lerp(632, 972 - dueW, p3) + 'px';
+      });
+      thDue.style.left = lerp(900, 1240 - thDueW, p3) + 'px';
+    },
+  };
+  return api;
+}
+
+/* ---------- build ---------- */
+const world = document.getElementById('world');
+const cursorEl = document.getElementById('cursor');
+
+const hero = h('div', 'a', world); hero.id = 'hero';
+const heroBorder = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); heroBorder.id = 'heroBorder';
+heroBorder.innerHTML = '<rect id="bSolid" fill="none" stroke-width="1"/><rect id="bDash" fill="none" stroke="#d4d4d4" stroke-width="1.5" stroke-dasharray="7 6"/>';
+
+const drop = h('div', 'a', hero); drop.id = 'dropContent';
+drop.innerHTML = `<div class="dropIcon">${ICON(IMAGE_PLUS, 26)}</div>
+  <div style="display:flex;flex-direction:column;gap:10px;align-items:center">
+    <div class="dropTitle">Paste an implementation capture</div>
+    <div class="dropHint">Press <span class="kbd">Ctrl</span> / <span class="kbd">⌘</span><span class="kbd">V</span>, or drop an image anywhere on this page.</div>
+  </div>`;
+
+const capWrap = h('div', 'a', hero);           // positioned + scaled capture
+const cap = northwind(capWrap);
+const band = h('div', 'a band', cap.root);
+
+// regions, pins and report cards live on the capture, in its pixels
+const REG = [
+  { a: [1126, 5], b: [1278, 59], tip: 'top-left' },
+  { a: [262, 84], b: null, tip: 'bottom-left' }, // width from the heading's measured width
+  { a: [262, 322], b: [1254, 370], tip: 'bottom-left' },
+];
+const regionEls = REG.map((r, i) => {
+  const el = h('div', 'a region', cap.root);
+  const hs = [0, 0.5, 1].flatMap(x => [0, 0.5, 1].map(y => [x, y])).filter(([x, y]) => !(x === 0.5 && y === 0.5)).map(() => h('div', 'a handle', cap.root));
+  const pin = h('div', 'a pin', cap.root, `<span>${i + 1}</span>`);
+  const card = h('div', 'a rcard', cap.root, NOTES[i]);
+  return { el, hs, pin, card };
+});
+const heroOverlay = heroBorder; hero.appendChild(heroOverlay);
+
+const btnC = h('div', 'a', hero); btnC.id = 'btnContent';
+const btnMark = h('div', 'a', btnC, CLAUDE(22)); btnMark.style.color = '#fff';
+const btnLabels = SEND.map(s => h('div', 'a blabel', btnC, s));
+
+const term = h('div', 'a', hero); term.id = 'termContent';
+h('div', 'a tbar', term);
+[18, 38, 58].forEach(x => { const d = h('div', 'a tdot', term); d.style.left = x + 'px'; });
+h('div', 'a ttitle', term, 'northwind — claude');
+h('div', 'a welcome', term, `<span style="color:var(--orange)">✻</span> Welcome to <b style="font-weight:600">Claude Code</b>!<br><br><span style="color:#a3a3a3">&nbsp;&nbsp;/help for help, /status for your current setup<br><br>&nbsp;&nbsp;cwd: /Users/dev/northwind</span>`);
+const input = h('div', 'a inputbox', term);
+const inputChev = h('div', 'a', input, '&gt;'); css(inputChev, { left: '18px', top: '14px', color: '#a3a3a3' });
+const inputText = h('span', '', input); inputText.textContent = PROMPT;
+const tcaret = h('span', 'tcaret', input);
+const hint = h('div', 'a', term, '? for shortcuts'); css(hint, { left: '46px', fontSize: '14px', color: '#737373' });
+
+// design reference
+const design = h('div', 'a', world); design.id = 'design';
+const designCapWrap = h('div', 'a', design);
+const des = northwind(designCapWrap);
+const designLabel = h('div', 'a label', world, 'Design reference');
+
+// divergences panel
+const panel = h('div', 'a', world); panel.id = 'panel';
+const pHead = h('div', 'a row label', panel, 'Divergences'); css(pHead, { left: '18px', top: '18px', height: '24px', fontSize: '14px' });
+const badges = [1, 2, 3].map(n => { const b = h('span', 'badge', null, String(n)); b.style.position = 'absolute'; return b; });
+const badgeWrap = h('div', 'a', panel); badges.forEach(b => badgeWrap.appendChild(b));
+const empty = h('div', 'a empty', panel, 'Nothing marked yet. Each region you draw gets a note here.'); css(empty, { left: '18px', top: '60px', width: '360px' });
+
+// note cards: each one is a pin that flies to the panel and opens
+const ncards = [0, 1, 2].map(i => {
+  const c = h('div', 'a ncard', world);
+  const disc = h('div', 'a ndisc', c, String(i + 1)); css(disc, { left: '14px', top: '14px' });
+  const txt = h('div', 'a ntext', c); css(txt, { left: '15px', top: '58px' });
+  return { c, disc, txt };
+});
+
+// keycaps
+const keyCmd = h('div', 'a key', world, ICON(COMMAND, 34));
+const keyV = h('div', 'a key', world, 'V');
+const keyEnter = h('div', 'a key', world, `${ICON(ENTER, 28)}<span style="font-size:24px">Enter</span>`);
+
+/* ---------- measured constants (fonts must be loaded) ---------- */
+let M = null;
+function measure() {
+  cap.measure(); des.measure();
+  cap.apply(0, 0, 0);
+  const hw = cap.head.offsetWidth;
+  REG[1].b = [262 + hw + 14, 118];
+  const cards = regionEls.map(r => ({ w: r.card.offsetWidth, h: r.card.offsetHeight }));
+  const labelW = btnLabels.map(l => l.offsetWidth);
+  const btnW = labelW.map(w => Math.round(26 + 22 + 12 + w + 26));
+  const inputH = input.offsetHeight;
+  // pins and cards, placed the way the product places them (region-style.ts)
+  const place = REG.map((r, i) => {
+    const [x0, y0] = r.a, [x1, y1] = r.b;
+    const above = r.tip === 'bottom-left';
+    const pin = [x0, above ? y0 - PS : y1, PS, PS];
+    const c = cards[i];
+    const right = pin[0] + PS + CARD_GAP;
+    const fits = right + c.w <= 1280;
+    const cx = fits ? right : pin[0] - CARD_GAP - c.w;
+    const cy = above ? pin[1] + PS - c.h : pin[1];
+    return { region: [x0, y0, x1 - x0, y1 - y0], pin, card: [clamp(cx, 0, 1280 - c.w), clamp(cy, 0, 820 - c.h), c.w, c.h] };
+  });
+  M = { place, btnW, labelW, inputH, headW: pHead.offsetWidth };
+  des.apply(1, 1, 1);
+  window.READY = true;
+}
+
+/* ---------- cursor path (world px) ---------- */
+function toWorld(p, k = K1, g = F1) { return [g[0] + p[0] * k, g[1] + p[1] * k]; }
+function cursorEvents() {
+  const r = M.place.map(p => ({ a: toWorld([p.region[0], p.region[1]]), b: toWorld([p.region[0] + p.region[2], p.region[1] + p.region[3]]) }));
+  const P0 = [1010, 1000];
+  const ev = [
+    [1.45, r[0].a],
+    [TL.drags[0].down, r[0].b, 21, 12.5],   // x leads, y trails: the leading edge runs ahead
+    [3.3, r[1].a],
+    [TL.drags[1].down, r[1].b, 21, 12.5],
+    [6.35, r[2].a],
+    [TL.drags[2].down, r[2].b, 17, 10.5],
+    [10.2, [1040, 880]],
+    [11.45, [770, 728]],
+    [12.3, [930, 860]],
+    [13.4, [735, 1124]],
+    [14.35, P0],
+  ];
+  return ev;
+}
+let CUR = null;
+function cursorAt(t) {
+  const xs = CUR.map(e => [e[0], e[1][0], e[2] ?? 10, e[2] ? 0.94 : 1]);
+  const ys = CUR.map(e => [e[0], e[1][1], e[3] ?? 10, e[3] ? 0.94 : 1]);
+  return [track(t, xs), track(t, ys)];
+}
+function pressAt(t) {
+  const holds = [...TL.drags.map(d => [d.down, d.up]), [TL.click, TL.click + 0.1], [TL.enter, TL.enter + 0.12], [TL.cmdDown - 0.02, TL.cmdDown + 0.62]];
+  let p = 0;
+  for (const [a, b] of holds.slice(0, 5)) p = Math.max(p, Math.min(easeOut((t - a) / 0.05), 1 - easeOut((t - b) / 0.07)));
+  return p;
+}
+
+/* ---------- camera ---------- */
+const CAM = [
+  [TL.paste, [720, 720, Math.log(1.0)]],
+  [1.6, [880, 545, Math.log(1.85)]],
+  [3.0, [1130, 610, Math.log(1.55)]],
+  [4.5, [420, 560, Math.log(1.85)]],
+  [6.0, [1130, 690, Math.log(1.55)]],
+  [7.5, [600, 690, Math.log(1.42)]],
+  [9.0, [1130, 770, Math.log(1.55)]],
+  [10.5, [720, 720, Math.log(1.0)]],
+  [11.05, [381, 720, Math.log(1.95)]],
+  [11.6, [720, 720, Math.log(2.0)]],
+  [13.0, [720, 730, Math.log(1.14)]],
+  [14.5, [720, 720, Math.log(1.3)]],
+  [TL.collapse, [720, 720, Math.log(1.55)]],
+];
+
+/* ---------- the one shape ---------- */
+function heroEvents() {
+  const bw = M.btnW, B = w => [720 - w / 2, 690, w, 60, 12];
+  return [
+    [TL.paste, F1], [TL.design, FR1], [TL.fold, FR2], [TL.toButton, B(bw[0])],
+    [TL.sending + 0.05, B(bw[1])], [TL.sent + 0.06, B(bw[2])],
+    [TL.terminal, FT], [TL.back, FC], [TL.collapse, F0],
+  ];
+}
+// colour: bg rgba, border rgb, border alpha, dash alpha, shadow
+const WHITE = [255, 255, 255, 1];
+const HCOL = [
+  [TL.paste, [...WHITE, 229, 229, 229, 1, 0, 1]],
+  [TL.fold, [...WHITE, 229, 229, 229, 1, 0, 1.5]],
+  [TL.toButton, [217, 119, 87, 1, 229, 229, 229, 0, 0, 0.6]],
+  [TL.click, [201, 100, 66, 1, 229, 229, 229, 0, 0, 0.3], 40, 1],
+  [TL.click + 0.1, [217, 119, 87, 1, 229, 229, 229, 0, 0, 0.6], 30, 1],
+  [TL.terminal, [23, 23, 23, 1, 48, 48, 48, 1, 0, 1.6], 60, 1],
+  [TL.back, [...WHITE, 229, 229, 229, 1, 0, 1], 50, 1],
+  [TL.collapse, [255, 255, 255, 0.4, 229, 229, 229, 0, 1, 0]],
+];
+
+let HEV = null;
+function heroAt(t) { return trackV(t, HEV, 13, 0.86); }
+function kAt(t, H) {
+  let k = track(t, [[TL.design, K2], [TL.back - 0.1, K1]], 13, 0.86);
+  if (t >= TL.toButton && t < TL.terminal) k = K2 * Math.min(1, H[2] / REP_W);
+  return k;
+}
+
+/* ---------- seek ---------- */
+function seek(tIn) {
+  const t = ((tIn % T) + T) % T;
+
+  /* camera */
+  const [cx, cy, lz] = trackV(t, CAM, 10, 1);
+  const z = Math.exp(lz);
+  world.style.transform = `translate(${(720 - cx * z).toFixed(3)}px, ${(720 - cy * z).toFixed(3)}px) scale(${z.toFixed(5)})`;
+  const toScreen = (x, y) => [(x - cx) * z + 720, (y - cy) * z + 720];
+
+  /* hero geometry + colour */
+  const H = heroAt(t);
+  const press = t >= TL.click - 0.01 && t < TL.click + 0.4 ? 1 - 0.03 * Math.min(easeOut((t - TL.click) / 0.04), 1 - easeOut((t - TL.click - 0.1) / 0.12)) : 1;
+  const hw = H[2] * press, hh = H[3] * press;
+  const hx = H[0] + (H[2] - hw) / 2, hy = H[1] + (H[3] - hh) / 2;
+  box(hero, hx, hy, hw, hh);
+  const C = trackV(t, HCOL, 18, 1);
+  const r = Math.max(0, H[4]);
+  css(hero, {
+    borderRadius: r + 'px',
+    background: `rgba(${C[0] | 0},${C[1] | 0},${C[2] | 0},${clamp(C[3], 0, 1).toFixed(3)})`,
+    boxShadow: C[9] > 0.01 ? `0 ${2 * C[9]}px ${4 * C[9]}px rgba(0,0,0,${0.03 * C[9]}), 0 ${14 * C[9]}px ${36 * C[9]}px -${10 * C[9]}px rgba(15,23,42,${0.2 * Math.min(C[9], 1.6)})` : 'none',
+  });
+  heroBorder.setAttribute('width', hw); heroBorder.setAttribute('height', hh);
+  const bs = heroBorder.querySelector('#bSolid'), bd = heroBorder.querySelector('#bDash');
+  for (const [el, inset] of [[bs, 0.5], [bd, 0.75]]) {
+    el.setAttribute('x', inset); el.setAttribute('y', inset);
+    el.setAttribute('width', Math.max(0, hw - 2 * inset)); el.setAttribute('height', Math.max(0, hh - 2 * inset));
+    el.setAttribute('rx', Math.max(0, r - inset));
+  }
+  bs.setAttribute('stroke', `rgb(${C[4] | 0},${C[5] | 0},${C[6] | 0})`);
+  bs.setAttribute('stroke-opacity', clamp(C[7], 0, 1));
+  bd.setAttribute('stroke-opacity', clamp(C[8], 0, 1));
+
+  /* content that swaps inside the one shape: each with its own enter and exit */
+  const tw = wrap(t, 8);
+  show(drop, win(tw, TL.collapse + 0.12, 0.26, T + TL.paste, 0.1), 10);
+  css(drop, { left: (hw - 600) / 2 + 'px', top: (hh - 340) / 2 + 'px' });
+
+  // capture
+  const k = kAt(t, H);
+  const ax = t >= TL.fold - 0.05 && t < TL.terminal ? 0 : 0.5;
+  const capL = (hw - 1280 * k) * ax, capT = (hh - 820 * k) / 2;
+  css(capWrap, { transform: `translate(${capL}px, ${capT}px) scale(${k})` });
+  const capO = Math.max(win(t, TL.paste + 0.06, 0.26, TL.toButton, 0.12), win(t, TL.back + 0.06, 0.22, TL.collapse, 0.12));
+  show(capWrap, capO, 10);
+  // the capture re-renders to match the design, one divergence at a time
+  const fixP = TL.fixes.map(f => track(t, [[f, 1, 16, 0.9], [TL.collapse + 0.25, 0, 30, 1]]));
+  cap.apply(...fixP);
+  band.style.opacity = easeOut((t - TL.fold) / 0.2) * (t < TL.terminal ? 1 : 0);
+
+  // regions, handles, pins, report cards
+  const cursorW = cursorAt(t);
+  const pr = pressAt(t);
+  M.place.forEach((p, i) => {
+    const d = TL.drags[i], R = regionEls[i];
+    const [x0, y0, w0, h0] = p.region;
+    let x1 = x0 + w0, y1 = y0 + h0;
+    // direct manipulation: while held, the far corner is the pointer
+    const toCap = ([wx, wy]) => [(wx - F1[0]) / K1, (wy - F1[1]) / K1];
+    if (t >= d.down && t < d.up) {
+      [x1, y1] = toCap(cursorW);
+    } else if (t >= d.up) {
+      const [rx, ry] = toCap(cursorAt(d.up));
+      const s = S(t - d.up, 22, 0.8);
+      x1 = lerp(rx, x1, s); y1 = lerp(ry, y1, s);
+    }
+    const alive = t >= d.down;
+    const dissolve = 1 - easeIO((t - TL.fixes[i]) / 0.3);
+    const regO = alive ? Math.min(easeOut((t - d.down) / 0.04), dissolve) : 0;
+    const ex = Math.min(x0, x1), ey = Math.min(y0, y1), ew = Math.abs(x1 - x0), eh = Math.abs(y1 - y0);
+    box(R.el, ex - 1.5, ey - 1.5, ew + 3, eh + 3);
+    show(R.el, regO * (t >= TL.back || t < TL.toButton + 0.2 ? 1 : 0), 6);
+    // handles: after release, gone from the report image
+    const hO = Math.min(easeOut((t - d.up) / 0.12), 1 - easeIO((t - TL.fold) / 0.12)) * (t < TL.back ? 1 : 0);
+    const hs = [0, 0.5, 1].flatMap(a => [0, 0.5, 1].map(b => [a, b])).filter(([a, b]) => !(a === 0.5 && b === 0.5));
+    hs.forEach(([a, b], j) => {
+      const e = R.hs[j];
+      css(e, { left: ex + ew * a + 'px', top: ey + eh * b + 'px', transform: `scale(${S(t - d.up - j * 0.012, 30, 0.8)})` });
+      show(e, hO, 0);
+    });
+    // pin: pushed out of the region's corner, squared corner touching it
+    const [px, py] = p.pin;
+    const above = REG[i].tip === 'bottom-left';
+    const ps = S(t - d.pin, 26, 0.72);
+    css(R.pin, {
+      left: px + 'px', top: py + 'px',
+      borderRadius: above ? '20px 20px 20px 0' : '0 20px 20px 20px',
+      transformOrigin: above ? '0 100%' : '0 0',
+      transform: `scale(${Math.max(0, ps)})`,
+    });
+    show(R.pin, t >= d.pin ? dissolve : 0, 4);
+    // report card: grows away from the region, never across it
+    const [qx, qy, qw, qh] = p.card;
+    const leftOfPin = qx < px;
+    const ct = TL.fold + 0.06 + i * 0.07;
+    const cs = S(t - ct, 22, 0.8);
+    css(R.card, {
+      left: qx + 'px', top: qy + 'px',
+      transformOrigin: `${leftOfPin ? '100%' : '0'} ${above ? '100%' : '0'}`,
+      transform: `scale(${lerp(0.5, 1, cs)})`,
+    });
+    show(R.card, win(t, ct, 0.18, TL.toButton, 0.1), 6);
+  });
+
+  // send button
+  const bO = win(t, TL.toButton + 0.1, 0.2, TL.terminal, 0.1);
+  show(btnC, bO, 8);
+  const labelO = [
+    win(t, TL.toButton + 0.1, 0.2, TL.sending - 0.03, 0.08),
+    win(t, TL.sending + 0.07, 0.14, TL.sent - 0.02, 0.08),
+    win(t, TL.sent + 0.08, 0.14, TL.terminal, 0.1),
+  ];
+  const lw = labelO.reduce((s, o, i) => s + o * M.labelW[i], 0) / Math.max(0.001, labelO.reduce((s, o) => s + o, 0));
+  const groupW = 22 + 12 + lw;
+  const gx = (hw - groupW) / 2;
+  css(btnMark, { left: gx + 'px', top: (hh - 22) / 2 + 'px' });
+  btnLabels.forEach((l, i) => { css(l, { left: gx + 34 + 'px', top: (hh - 28) / 2 + 'px', lineHeight: '28px' }); show(l, labelO[i], 6); });
+
+  // terminal: the prompt is already typed in; it waits on Enter
+  show(term, win(t, TL.terminal + 0.14, 0.24, TL.back, 0.1), 10);
+  const inputTop = 70 + 176;
+  css(input, { top: inputTop + 'px' });
+  css(hint, { top: inputTop + M.inputH + 12 + 'px' });
+  const blinkOn = ((t - TL.terminal) % BEAT) < BEAT * 0.55 || t < TL.terminal + 0.4;
+  const sentToAgent = t >= TL.enter;
+  tcaret.style.opacity = sentToAgent ? 0 : blinkOn ? 1 : 0;
+  inputText.style.color = sentToAgent ? '#a3a3a3' : '#e5e5e5';
+  input.style.borderColor = sentToAgent ? '#737373' : '#525252';
+
+  /* design reference: slides in beside the capture, then docks into the report */
+  let D;
+  if (t >= TL.toButton && t < TL.terminal) {
+    D = [H[0] + H[2] * (1304 / 2584), H[1] + (H[3] - 820 * k) / 2, H[2] * (1280 / 2584), 820 * k];
+  } else {
+    const dx = lerp(738 + 260, 738, S(t - TL.design - 0.04, 12, 0.9));
+    const dock = S(t - TL.fold, 13, 0.86);
+    D = [lerp(dx, 48 + 1304 * K2, dock), 720 - REP_H / 2, 1280 * K2, REP_H];
+  }
+  box(design, ...D);
+  const dk = t >= TL.toButton ? 1 : S(t - TL.fold, 13, 0.86);
+  css(design, {
+    borderRadius: lerp(10, 0, clamp(dk, 0, 1)) + 'px',
+    boxShadow: `0 0 0 1px rgba(229,229,229,${1 - clamp(dk, 0, 1)}), 0 14px 36px -10px rgba(15,23,42,${0.2 * (1 - clamp(dk, 0, 1))})`,
+  });
+  css(designCapWrap, { transform: `scale(${D[2] / 1280})` });
+  show(design, win(t, TL.design + 0.05, 0.22, TL.toButton, 0.12), 10);
+  box(designLabel, 738 - 0, 720 - REP_H / 2 - 36, 300, 22);
+  show(designLabel, win(t, TL.design + 0.12, 0.2, TL.fold, 0.1), 6);
+
+  /* divergences panel */
+  const pO = win(t, TL.paste + 0.22, 0.28, TL.design, 0.14);
+  const pShift = (1 - S(t - TL.paste - 0.2, 12, 0.9)) * 40 + (t > TL.design ? easeIO((t - TL.design) / 0.2) * 60 : 0);
+  box(panel, PANEL[0] + pShift, PANEL[1], PANEL[2], PANEL[3]);
+  show(panel, pO, 8);
+  const count = TL.drags.filter(d => t >= d.pin).length;
+  const headW = M.headW;
+  badges.forEach((b, i) => {
+    css(b, { left: 18 + headW + 'px', top: '19px' });
+    const d = TL.drags[i], next = TL.drags[i + 1];
+    show(b, win(t, d.pin + 0.04, 0.14, next ? next.pin : 99, 0.06), 5);
+  });
+  show(empty, 1 - easeIO((t - TL.drags[0].open) / 0.12), 5);
+
+  /* note cards: the pin opens into the card */
+  ncards.forEach((n, i) => {
+    const d = TL.drags[i], p = M.place[i];
+    const pinW = toWorld([p.pin[0], p.pin[1]]);
+    const from = [pinW[0], pinW[1], PS * K1, PS * K1];
+    const to = SLOT(i);
+    const s = S(t - d.open, 12, 0.86);
+    const g = from.map((v, j) => lerp(v, to[j], s));
+    box(n.c, g[0] + pShift, g[1], g[2], g[3]);
+    const above = REG[i].tip === 'bottom-left';
+    const half = PS * K1 / 2;
+    const radii = (above ? [half, half, half, 0] : [0, half, half, half]).map(rr => lerp(rr, 10, clamp(s, 0, 1)));
+    const col = clamp(easeOut((t - d.open) / 0.2), 0, 1);
+    css(n.c, {
+      borderRadius: radii.map(rr => rr + 'px').join(' '),
+      background: `rgb(${lerp(225, 255, col) | 0},${lerp(29, 255, col) | 0},${lerp(72, 255, col) | 0})`,
+      boxShadow: `0 0 0 1px rgba(229,229,229,${col})`,
+    });
+    const alive = t >= d.open;
+    show(n.c, alive ? pO : 0, 8);
+    show(n.disc, win(t, d.open + 0.12, 0.16, 99, 1), 4);
+    const typed = Math.floor(clamp((t - d.type) * TL.cps, 0, NOTES[i].length));
+    const focused = t >= d.open + 0.1 && t < (TL.drags[i + 1]?.open ?? TL.design);
+    const caretOn = focused && (typed < NOTES[i].length || ((t - d.type) % BEAT) < BEAT * 0.55);
+    n.txt.innerHTML = (typed ? escapeHtml(NOTES[i].slice(0, typed)) : '') + (caretOn ? '<span class="caret"></span>' : '') + (typed ? '' : '<span class="ph">What is wrong here?</span>');
+    show(n.txt, win(t, d.open + 0.16, 0.18, 99, 1), 5);
+  });
+
+  /* keycaps */
+  const keyPress = (t0, t1) => Math.min(easeOut((t - t0) / 0.035), 1 - easeOut((t - t1) / 0.06));
+  const kv = [[keyCmd, 629, TL.cmdDown, TL.vDown + 0.12], [keyV, 727, TL.vDown, TL.vDown + 0.12]];
+  const kO = win(wrap(t, 8), T - 0.0 + 0.05, 0.2, T + TL.vDown + 0.14, 0.14);
+  kv.forEach(([el, x, a, b]) => {
+    const p = keyPress(a, b);
+    box(el, x, 915 + 3 * p + (1 - kO) * 12, 84, 84);
+    css(el, { borderBottomWidth: 4 - 3 * p + 'px', background: p > 0.5 ? '#f5f5f5' : '#fff' });
+    show(el, kO, 6);
+  });
+  const eO = win(t, TL.terminal + 0.4, 0.2, TL.back, 0.12);
+  const ep = keyPress(TL.enter, TL.enter + 0.12);
+  box(keyEnter, 645, 1084 + 3 * ep + (1 - eO) * 12, 150, 72);
+  css(keyEnter, { borderBottomWidth: 4 - 3 * ep + 'px', background: ep > 0.5 ? '#f5f5f5' : '#fff' });
+  show(keyEnter, eO, 6);
+
+  /* cursor */
+  const [sx, sy] = toScreen(cursorW[0], cursorW[1]);
+  cursorEl.style.transform = `translate(${(sx - 4).toFixed(2)}px, ${(sy - 3).toFixed(2)}px) scale(${1 - 0.12 * pr})`;
+}
+function escapeHtml(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+
+/* ---------- UI sounds, for the mixer ---------- */
+function sounds() {
+  const s = [
+    { t: TL.cmdDown, type: 'key', gain: 0.9 },
+    { t: TL.vDown, type: 'key', gain: 0.9 },
+    { t: TL.paste + 0.01, type: 'paste', gain: 1 },
+  ];
+  TL.drags.forEach((d, i) => {
+    s.push({ t: d.down, type: 'dragstart', gain: 0.9 }, { t: d.up, type: 'release', gain: 0.7 }, { t: d.pin, type: 'pin', gain: 1 });
+    for (let c = 0; c < NOTES[i].length; c++) s.push({ t: d.type + c / TL.cps, type: 'tap', gain: 0.55, seed: i * 100 + c });
+  });
+  s.push({ t: TL.design, type: 'whoosh', gain: 0.6 }, { t: TL.fold, type: 'fold', gain: 0.8 },
+    { t: TL.toButton, type: 'whoosh', gain: 0.45 }, { t: TL.click, type: 'click', gain: 1 },
+    { t: TL.sent, type: 'sent', gain: 0.7 }, { t: TL.terminal, type: 'whoosh', gain: 0.5 },
+    { t: TL.enter, type: 'enter', gain: 1 }, { t: TL.back, type: 'whoosh', gain: 0.45 });
+  TL.fixes.forEach((f, i) => s.push({ t: f, type: 'dissolve', gain: 0.7, seed: i }));
+  s.push({ t: TL.collapse, type: 'fold', gain: 0.6 });
+  return s;
+}
+
+document.fonts.ready.then(() => {
+  measure();
+  HEV = heroEvents();
+  CUR = cursorEvents();
+  window.SOUNDS = sounds();
+  window.seek = seek;
+  seek(0);
+});
+</script>
+</body>
+</html>
