@@ -85,6 +85,9 @@ html, body { margin: 0; background: var(--stage); }
 /* ---------- send button + terminal (content that lives inside the one shape) ---------- */
 #btnContent { inset: 0; width: 100%; height: 100%; }
 .blabel { color: #fff; font-size: 20px; font-weight: 500; white-space: nowrap; letter-spacing: -0.005em; }
+/* the toolbar's Send button, as the app lays it out above the stage */
+#sendBtn { display: flex; align-items: center; gap: 10px; padding: 0 18px; border-radius: 10px; color: #fff; white-space: nowrap;
+  font-size: 17px; font-weight: 500; letter-spacing: -0.005em; transform-origin: 50% 50%; }
 #termContent { width: 1100px; height: 680px; font-family: 'Geist Mono', monospace; color: #e5e5e5; }
 .tbar { left: 0; top: 0; width: 1100px; height: 44px; border-bottom: 1px solid #2a2a2a; background: #1f1f1f; }
 .tdot { top: 16px; width: 12px; height: 12px; border-radius: 99px; background: #404040; }
@@ -124,24 +127,30 @@ function S(x, w, z) {
   const wd = w * Math.sqrt(1 - z * z);
   return 1 - e * (Math.cos(wd * x) + (z * w / wd) * Math.sin(wd * x));
 }
+/* Minimum-jerk reach: the profile a hand follows moving a pointer to a target,
+ * slow to leave, quick through the middle, settling without overshoot. */
+function reach(x) { if (x <= 0) return 0; if (x >= 1) return 1; return x * x * x * (10 - 15 * x + 6 * x * x); }
 /* A value that changes target many times is the sum of one spring per change.
  * Each change also contributes from one loop earlier (t + T), so the value is
- * periodic in T and the last frame is the first. evs: [[time, target, w?, z?]] */
+ * periodic in T and the last frame is the first.
+ * evs: [[time, target, w?, z?, reachDuration?]] — a duration makes that change
+ * a deliberate reach instead of a spring. */
 function track(t, evs, w = 13, z = 0.86) {
   let prev = evs[evs.length - 1][1];
   let v = prev;
   for (const e of evs) {
     const d = e[1] - prev; prev = e[1];
     if (d === 0) continue;
-    const ww = e[2] ?? w, zz = e[3] ?? z;
-    v += d * (S(t - e[0], ww, zz) + S(t - e[0] + T, ww, zz) - 1);
+    const ww = e[2] ?? w, zz = e[3] ?? z, dur = e[4];
+    const step = dur ? x => reach(x / dur) : x => S(x, ww, zz);
+    v += d * (step(t - e[0]) + step(t - e[0] + T) - 1);
   }
   return v;
 }
 /* vector version: evs [[time, [a,b,c..], w?, z?]] */
 function trackV(t, evs, w, z) {
   const n = evs[0][1].length, out = [];
-  for (let i = 0; i < n; i++) out.push(track(t, evs.map(e => [e[0], e[1][i], e[2], e[3]]), w, z));
+  for (let i = 0; i < n; i++) out.push(track(t, evs.map(e => [e[0], e[1][i], e[2], e[3], e[4]]), w, z));
   return out;
 }
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -200,11 +209,14 @@ const TL = {
   cmdDown: 0.5, vDown: 1.0, paste: 1.0,
   drags: [ // mouse down, release, pin snap, card opens, typing starts
     { down: 2.0, up: 2.5, pin: 2.75, open: 3.0, type: 3.25 },
-    { down: 5.0, up: 5.5, pin: 5.75, open: 6.0, type: 6.25 },
-    { down: 8.0, up: 8.5, pin: 8.75, open: 9.0, type: 9.25 },
+    { down: 4.75, up: 5.25, pin: 5.5, open: 5.75, type: 6.0 },
+    { down: 7.5, up: 8.0, pin: 8.25, open: 8.5, type: 8.75 },
   ],
   cps: 34,
-  design: 10.5, fold: 10.9, toButton: 11.6, click: 12.0, sending: 12.05, sent: 12.5,
+  // the last note is finished: the pointer travels to the toolbar's Send button,
+  // settles on it, and presses it. Everything after follows from that press.
+  toSend: 10.1, reach: 0.72, click: 11.0,
+  design: 11.15, fold: 11.5, toButton: 12.1, sent: 12.5,
   terminal: 13.0, enter: 14.0, back: 14.5, fixes: [14.75, 15.0, 15.25], collapse: 15.5,
 };
 
@@ -218,6 +230,7 @@ const FR1 = [48, 720 - REP_H / 2, 1280 * K2, REP_H, 10];
 const FR2 = [48, 720 - REP_H / 2, REP_W, REP_H, 4];
 const FT = [170, 380, 1100, 680, 14];
 const PANEL = [990, 425, 410, 820 * K1];
+const SEND_H = 44, SEND_Y = F1[1] - 14 - SEND_H;    // the toolbar above the capture
 const SLOT = i => [PANEL[0] + 16, PANEL[1] + 60 + i * 134, 378, 122];
 
 /* ---------- capture (native px) ---------- */
@@ -343,6 +356,9 @@ const designCapWrap = h('div', 'a', design);
 const des = northwind(designCapWrap);
 const designLabel = h('div', 'a label', world, 'Design reference');
 
+// toolbar: Send to Claude Code leads, as it does in the app
+const sendBtn = h('div', 'a', world, `${CLAUDE(18)}<span>${SEND[0]}</span>`); sendBtn.id = 'sendBtn';
+
 // divergences panel
 const panel = h('div', 'a', world); panel.id = 'panel';
 const pHead = h('div', 'a row label', panel, 'Divergences'); css(pHead, { left: '18px', top: '18px', height: '24px', fontSize: '14px' });
@@ -386,7 +402,7 @@ function measure() {
     const cy = above ? pin[1] + PS - c.h : pin[1];
     return { region: [x0, y0, x1 - x0, y1 - y0], pin, card: [clamp(cx, 0, 1280 - c.w), clamp(cy, 0, 820 - c.h), c.w, c.h] };
   });
-  M = { place, btnW, labelW, inputH, headW: pHead.offsetWidth };
+  M = { place, btnW, labelW, inputH, headW: pHead.offsetWidth, send: [F1[0], SEND_Y, sendBtn.offsetWidth, SEND_H] };
   des.apply(1, 1, 1);
   window.READY = true;
 }
@@ -396,16 +412,18 @@ function toWorld(p, k = K1, g = F1) { return [g[0] + p[0] * k, g[1] + p[1] * k];
 function cursorEvents() {
   const r = M.place.map(p => ({ a: toWorld([p.region[0], p.region[1]]), b: toWorld([p.region[0] + p.region[2], p.region[1] + p.region[3]]) }));
   const P0 = [1010, 1000];
+  // aim a little left of the label's middle, where a hand lands on a button
+  const [sx, sy, sw, sh] = M.send;
+  const onSend = [sx + sw * 0.42, sy + sh * 0.55];
   const ev = [
     [1.45, r[0].a],
     [TL.drags[0].down, r[0].b, 21, 12.5],   // x leads, y trails: the leading edge runs ahead
     [3.3, r[1].a],
     [TL.drags[1].down, r[1].b, 21, 12.5],
-    [6.35, r[2].a],
+    [6.1, r[2].a],
     [TL.drags[2].down, r[2].b, 17, 10.5],
-    [10.2, [1040, 880]],
-    [11.45, [770, 728]],
-    [12.3, [930, 860]],
+    [TL.toSend, onSend, null, null, TL.reach],
+    [11.4, [600, 1030]],
     [13.4, [735, 1124]],
     [14.35, P0],
   ];
@@ -413,8 +431,9 @@ function cursorEvents() {
 }
 let CUR = null;
 function cursorAt(t) {
-  const xs = CUR.map(e => [e[0], e[1][0], e[2] ?? 10, e[2] ? 0.94 : 1]);
-  const ys = CUR.map(e => [e[0], e[1][1], e[3] ?? 10, e[3] ? 0.94 : 1]);
+  // on a reach, y sets off a moment after x, so the path bows like a wrist's
+  const xs = CUR.map(e => [e[0], e[1][0], e[2] ?? 10, e[2] ? 0.94 : 1, e[4]]);
+  const ys = CUR.map(e => [e[0] + (e[4] ? 0.06 : 0), e[1][1], e[3] ?? 10, e[3] ? 0.94 : 1, e[4]]);
   return [track(t, xs), track(t, ys)];
 }
 function pressAt(t) {
@@ -429,13 +448,15 @@ const CAM = [
   [TL.paste, [720, 720, Math.log(1.0)]],
   [1.6, [880, 545, Math.log(1.85)]],
   [3.0, [1130, 610, Math.log(1.55)]],
-  [4.5, [420, 560, Math.log(1.85)]],
-  [6.0, [1130, 690, Math.log(1.55)]],
-  [7.5, [600, 690, Math.log(1.42)]],
-  [9.0, [1130, 770, Math.log(1.55)]],
-  [10.5, [720, 720, Math.log(1.0)]],
-  [11.05, [381, 720, Math.log(1.95)]],
-  [11.6, [720, 720, Math.log(2.0)]],
+  [4.25, [420, 560, Math.log(1.85)]],
+  [5.75, [1130, 690, Math.log(1.55)]],
+  [7.0, [600, 690, Math.log(1.42)]],
+  [8.5, [1130, 770, Math.log(1.55)]],
+  // pull back to the whole app on the same reach as the pointer, so on screen
+  // it travels one way to the button; then hold still for the press
+  [TL.toSend, [720, 720, Math.log(1.0)], null, null, TL.reach],
+  [TL.fold + 0.15, [381, 720, Math.log(1.95)]],
+  [TL.toButton, [720, 720, Math.log(2.0)]],
   [13.0, [720, 730, Math.log(1.14)]],
   [14.5, [720, 720, Math.log(1.3)]],
   [TL.collapse, [720, 720, Math.log(1.55)]],
@@ -445,8 +466,9 @@ const CAM = [
 function heroEvents() {
   const bw = M.btnW, B = w => [720 - w / 2, 690, w, 60, 12];
   return [
-    [TL.paste, F1], [TL.design, FR1], [TL.fold, FR2], [TL.toButton, B(bw[0])],
-    [TL.sending + 0.05, B(bw[1])], [TL.sent + 0.06, B(bw[2])],
+    // already pressed in the toolbar, so the report arrives as the button mid-send
+    [TL.paste, F1], [TL.design, FR1], [TL.fold, FR2], [TL.toButton, B(bw[1])],
+    [TL.sent + 0.06, B(bw[2])],
     [TL.terminal, FT], [TL.back, FC], [TL.collapse, F0],
   ];
 }
@@ -456,8 +478,6 @@ const HCOL = [
   [TL.paste, [...WHITE, 229, 229, 229, 1, 0, 1]],
   [TL.fold, [...WHITE, 229, 229, 229, 1, 0, 1.5]],
   [TL.toButton, [217, 119, 87, 1, 229, 229, 229, 0, 0, 0.6]],
-  [TL.click, [201, 100, 66, 1, 229, 229, 229, 0, 0, 0.3], 40, 1],
-  [TL.click + 0.1, [217, 119, 87, 1, 229, 229, 229, 0, 0, 0.6], 30, 1],
   [TL.terminal, [23, 23, 23, 1, 48, 48, 48, 1, 0, 1.6], 60, 1],
   [TL.back, [...WHITE, 229, 229, 229, 1, 0, 1], 50, 1],
   [TL.collapse, [255, 255, 255, 0.4, 229, 229, 229, 0, 1, 0]],
@@ -483,9 +503,7 @@ function seek(tIn) {
 
   /* hero geometry + colour */
   const H = heroAt(t);
-  const press = t >= TL.click - 0.01 && t < TL.click + 0.4 ? 1 - 0.03 * Math.min(easeOut((t - TL.click) / 0.04), 1 - easeOut((t - TL.click - 0.1) / 0.12)) : 1;
-  const hw = H[2] * press, hh = H[3] * press;
-  const hx = H[0] + (H[2] - hw) / 2, hy = H[1] + (H[3] - hh) / 2;
+  const [hx, hy, hw, hh] = H;
   box(hero, hx, hy, hw, hh);
   const C = trackV(t, HCOL, 18, 1);
   const r = Math.max(0, H[4]);
@@ -580,8 +598,8 @@ function seek(tIn) {
   const bO = win(t, TL.toButton + 0.1, 0.2, TL.terminal, 0.1);
   show(btnC, bO, 8);
   const labelO = [
-    win(t, TL.toButton + 0.1, 0.2, TL.sending - 0.03, 0.08),
-    win(t, TL.sending + 0.07, 0.14, TL.sent - 0.02, 0.08),
+    0,
+    win(t, TL.toButton + 0.1, 0.2, TL.sent - 0.02, 0.08),
     win(t, TL.sent + 0.08, 0.14, TL.terminal, 0.1),
   ];
   const lw = labelO.reduce((s, o, i) => s + o * M.labelW[i], 0) / Math.max(0.001, labelO.reduce((s, o) => s + o, 0));
@@ -621,6 +639,27 @@ function seek(tIn) {
   box(designLabel, 738 - 0, 720 - REP_H / 2 - 36, 300, 22);
   show(designLabel, win(t, TL.design + 0.12, 0.2, TL.fold, 0.1), 6);
 
+  /* toolbar Send button: hover follows the pointer, the press is the click */
+  {
+    const [bx, by, bw, bh] = M.send;
+    const inside = ([x, y]) => x >= bx && x <= bx + bw && y >= by && y <= by + bh;
+    // a hover fades in over ~120ms: the share of that window the pointer was on it
+    let hov = 0;
+    for (let j = 0; j < 8; j++) hov += inside(cursorAt(t - (j / 7) * 0.12)) ? 1 / 8 : 0;
+    hov = easeIO(hov);
+    const prs = Math.min(easeOut((t - TL.click) / 0.04), 1 - easeOut((t - TL.click - 0.1) / 0.12));
+    const col = [[217, 119, 87], [207, 108, 75], [201, 100, 66]];
+    const mix = (a, b, p) => a.map((v, i) => lerp(v, b[i], p));
+    const c = mix(mix(col[0], col[1], hov), col[2], Math.max(0, prs));
+    box(sendBtn, bx, by, bw, bh);
+    css(sendBtn, {
+      background: `rgb(${c.map(v => v | 0).join(',')})`,
+      boxShadow: `0 1px 2px rgba(0,0,0,.08), 0 ${4 + 2 * hov}px ${12 + 4 * hov}px -4px rgba(217,119,87,${0.35 + 0.15 * hov - 0.2 * Math.max(0, prs)})`,
+      transform: `scale(${1 - 0.03 * Math.max(0, prs)})`,
+    });
+    show(sendBtn, win(t, TL.paste + 0.22, 0.28, TL.design, 0.14), 8);
+  }
+
   /* divergences panel */
   const pO = win(t, TL.paste + 0.22, 0.28, TL.design, 0.14);
   const pShift = (1 - S(t - TL.paste - 0.2, 12, 0.9)) * 40 + (t > TL.design ? easeIO((t - TL.design) / 0.2) * 60 : 0);
@@ -657,7 +696,7 @@ function seek(tIn) {
     show(n.c, alive ? pO : 0, 8);
     show(n.disc, win(t, d.open + 0.12, 0.16, 99, 1), 4);
     const typed = Math.floor(clamp((t - d.type) * TL.cps, 0, NOTES[i].length));
-    const focused = t >= d.open + 0.1 && t < (TL.drags[i + 1]?.open ?? TL.design);
+    const focused = t >= d.open + 0.1 && t < (TL.drags[i + 1]?.open ?? TL.click);
     const caretOn = focused && (typed < NOTES[i].length || ((t - d.type) % BEAT) < BEAT * 0.55);
     n.txt.innerHTML = (typed ? escapeHtml(NOTES[i].slice(0, typed)) : '') + (caretOn ? '<span class="caret"></span>' : '') + (typed ? '' : '<span class="ph">What is wrong here?</span>');
     show(n.txt, win(t, d.open + 0.16, 0.18, 99, 1), 5);
