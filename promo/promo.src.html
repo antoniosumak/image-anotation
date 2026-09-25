@@ -125,24 +125,30 @@ function S(x, w, z) {
   const wd = w * Math.sqrt(1 - z * z);
   return 1 - e * (Math.cos(wd * x) + (z * w / wd) * Math.sin(wd * x));
 }
-/* A value that changes target many times is the sum of one spring per change.
+/* Minimum-jerk ease: starts from rest, moves through the middle, and arrives at
+ * rest, with no jolt at either end and no overshoot. */
+function glide(x) { if (x <= 0) return 0; if (x >= 1) return 1; return x * x * x * (10 - 15 * x + 6 * x * x); }
+/* A value that changes target many times is the sum of one step per change.
  * Each change also contributes from one loop earlier (t + T), so the value is
- * periodic in T and the last frame is the first. evs: [[time, target, w?, z?]] */
+ * periodic in T and the last frame is the first.
+ * evs: [[time, target, w?, z?, dur?]] — a step is a spring, or with a duration
+ * a glide, which is what anything the eye has to follow closely should use. */
 function track(t, evs, w = 13, z = 0.86) {
   let prev = evs[evs.length - 1][1];
   let v = prev;
   for (const e of evs) {
     const d = e[1] - prev; prev = e[1];
     if (d === 0) continue;
-    const ww = e[2] ?? w, zz = e[3] ?? z;
-    v += d * (S(t - e[0], ww, zz) + S(t - e[0] + T, ww, zz) - 1);
+    const ww = e[2] ?? w, zz = e[3] ?? z, dur = e[4];
+    const step = dur ? x => glide(x / dur) : x => S(x, ww, zz);
+    v += d * (step(t - e[0]) + step(t - e[0] + T) - 1);
   }
   return v;
 }
 /* vector version: evs [[time, [a,b,c..], w?, z?]] */
 function trackV(t, evs, w, z) {
   const n = evs[0][1].length, out = [];
-  for (let i = 0; i < n; i++) out.push(track(t, evs.map(e => [e[0], e[1][i], e[2], e[3]]), w, z));
+  for (let i = 0; i < n; i++) out.push(track(t, evs.map(e => [e[0], e[1][i], e[2], e[3], e[4]]), w, z));
   return out;
 }
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -210,9 +216,13 @@ const TL = {
   // after the last note, every step gets room to be read before the next one:
   // the report is held long enough to take in its notes and both halves, the
   // prompt sits waiting in the terminal, and each fix lands on its own
-  design: 11.0, fold: 12.25, toButton: 15.0, click: 16.0, sending: 16.05, sent: 17.0,
+  design: 11.0, fold: 12.25, toButton: 14.75, click: 16.25, sending: 16.3, sent: 17.0,
   terminal: 18.0, enter: 20.0, back: 20.75, fixes: [21.25, 21.75, 22.25], collapse: 23.0,
 };
+
+// how long the one shape takes to become the button, change its label, and open
+const GLIDE = { form: 0.85, relabel: 0.5, open: 0.9 };
+const PRESS = { down: 0.08, up: 0.25 };
 
 /* ---------- world geometry ---------- */
 const F0 = [420, 550, 600, 340, 16];                 // the dashed drop target
@@ -410,17 +420,18 @@ function cursorEvents() {
     [6.1, r[2].a],
     [TL.drags[2].down, r[2].b, 17, 10.5],
     [10.3, [1040, 1010]],                    // out of the way, below the report
-    [TL.toButton + 0.35, [770, 728]],       // sets off once the button has formed
-    [TL.click + 0.3, [930, 860]],
-    [TL.terminal + 0.4, [735, 1124]],
+    [TL.toButton + GLIDE.form, [770, 728], null, null, 0.45], // sets off once the button and camera are still
+    [TL.click + 0.35, [930, 860], null, null, 0.6],
+    [TL.terminal + 0.5, [735, 1124], null, null, 0.7],
     [TL.enter + 0.35, P0],
   ];
   return ev;
 }
 let CUR = null;
 function cursorAt(t) {
-  const xs = CUR.map(e => [e[0], e[1][0], e[2] ?? 10, e[2] ? 0.94 : 1]);
-  const ys = CUR.map(e => [e[0], e[1][1], e[3] ?? 10, e[3] ? 0.94 : 1]);
+  // on a glide, y sets off a moment after x, so the path bows like a wrist's
+  const xs = CUR.map(e => [e[0], e[1][0], e[2] ?? 10, e[2] ? 0.94 : 1, e[4]]);
+  const ys = CUR.map(e => [e[0] + (e[4] ? 0.06 : 0), e[1][1], e[3] ?? 10, e[3] ? 0.94 : 1, e[4]]);
   return [track(t, xs), track(t, ys)];
 }
 function pressAt(t) {
@@ -441,9 +452,9 @@ const CAM = [
   [8.5, [1130, 770, Math.log(1.55)]],
   [10.6, [720, 720, Math.log(1.0)], 7, 1],             // ease back to the whole app
   [TL.fold + 0.25, [381, 720, Math.log(1.95)], 8, 1],  // read the capture's notes
-  [TL.fold + 1.5, [1059, 720, Math.log(1.95)], 5, 1],  // drift across to the design half
-  [TL.toButton, [720, 720, Math.log(2.0)], 8, 1],
-  [TL.terminal, [720, 730, Math.log(1.14)]],
+  [TL.fold + 1.25, [1059, 720, Math.log(1.95)], null, null, 1.0],  // drift across to the design half
+  [TL.toButton, [720, 720, Math.log(2.0)], null, null, GLIDE.form], // follows the report into the button
+  [TL.terminal, [720, 730, Math.log(1.14)], null, null, GLIDE.open],
   [TL.back, [720, 720, Math.log(1.3)]],
   [TL.collapse, [720, 720, Math.log(1.55)]],
 ];
@@ -453,9 +464,12 @@ function heroEvents() {
   const bw = M.btnW, B = w => [720 - w / 2, 690, w, 60, 12];
   return [
     // after the last note the shape moves a touch softer, so each change can be followed
-    [TL.paste, F1], [TL.design, FR1, 10, 0.9], [TL.fold, FR2, 10, 0.9], [TL.toButton, B(bw[0]), 10, 0.9],
-    [TL.sending + 0.05, B(bw[1])], [TL.sent + 0.06, B(bw[2])],
-    [TL.terminal, FT, 10, 0.9], [TL.back, FC, 10, 0.9], [TL.collapse, F0, 10, 0.9],
+    [TL.paste, F1], [TL.design, FR1, 10, 0.9], [TL.fold, FR2, 10, 0.9],
+    // report -> button -> terminal glide rather than spring: no jolt, no overshoot
+    [TL.toButton, B(bw[0]), null, null, GLIDE.form],
+    // the press finishes coming back up before the button narrows to its new label
+    [TL.click + PRESS.down + PRESS.up, B(bw[1]), null, null, GLIDE.relabel], [TL.sent + 0.05, B(bw[2]), null, null, GLIDE.relabel],
+    [TL.terminal, FT, null, null, GLIDE.open], [TL.back, FC, 10, 0.9], [TL.collapse, F0, 10, 0.9],
   ];
 }
 // colour: bg rgba, border rgb, border alpha, dash alpha, shadow
@@ -463,10 +477,12 @@ const WHITE = [255, 255, 255, 1];
 const HCOL = [
   [TL.paste, [...WHITE, 229, 229, 229, 1, 0, 1]],
   [TL.fold, [...WHITE, 229, 229, 229, 1, 0, 1.5]],
-  [TL.toButton, [217, 119, 87, 1, 229, 229, 229, 0, 0, 0.6]],
-  [TL.click, [201, 100, 66, 1, 229, 229, 229, 0, 0, 0.3], 40, 1],
-  [TL.click + 0.1, [217, 119, 87, 1, 229, 229, 229, 0, 0, 0.6], 30, 1],
-  [TL.terminal, [23, 23, 23, 1, 48, 48, 48, 1, 0, 1.6], 60, 1],
+  // stays the report's white while it shrinks, warms to the button as it arrives
+  [TL.toButton + 0.25, [217, 119, 87, 1, 229, 229, 229, 0, 0, 0.6], null, null, 0.5],
+  [TL.click, [201, 100, 66, 1, 229, 229, 229, 0, 0, 0.3], null, null, PRESS.down],
+  [TL.click + PRESS.down, [217, 119, 87, 1, 229, 229, 229, 0, 0, 0.6], null, null, PRESS.up],
+  // goes dark early, so the growing shape reads as the terminal, never brown
+  [TL.terminal, [23, 23, 23, 1, 48, 48, 48, 1, 0, 1.6], null, null, 0.25],
   [TL.back, [...WHITE, 229, 229, 229, 1, 0, 1], 50, 1],
   [TL.collapse, [255, 255, 255, 0.4, 229, 229, 229, 0, 1, 0]],
 ];
@@ -491,7 +507,7 @@ function seek(tIn) {
 
   /* hero geometry + colour */
   const H = heroAt(t);
-  const press = t >= TL.click - 0.01 && t < TL.click + 0.4 ? 1 - 0.03 * Math.min(easeOut((t - TL.click) / 0.04), 1 - easeOut((t - TL.click - 0.1) / 0.12)) : 1;
+  const press = 1 - 0.025 * Math.min(easeIO((t - TL.click) / PRESS.down), 1 - easeIO((t - TL.click - PRESS.down) / PRESS.up));
   const hw = H[2] * press, hh = H[3] * press;
   const hx = H[0] + (H[2] - hw) / 2, hy = H[1] + (H[3] - hh) / 2;
   box(hero, hx, hy, hw, hh);
@@ -523,7 +539,7 @@ function seek(tIn) {
   const ax = t >= TL.fold - 0.05 && t < TL.terminal ? 0 : 0.5;
   const capL = (hw - 1280 * k) * ax, capT = (hh - 820 * k) / 2;
   css(capWrap, { transform: `translate(${capL}px, ${capT}px) scale(${k})` });
-  const capO = Math.max(win(t, TL.paste + 0.06, 0.26, TL.toButton, 0.12), win(t, TL.back + 0.06, 0.22, TL.collapse, 0.12));
+  const capO = Math.max(win(t, TL.paste + 0.06, 0.26, TL.toButton, 0.3), win(t, TL.back + 0.06, 0.22, TL.collapse, 0.12));
   show(capWrap, capO, 10);
   // the capture re-renders to match the design, one divergence at a time
   const fixP = TL.fixes.map(f => track(t, [[f, 1, 16, 0.9], [TL.collapse + 0.25, 0, 30, 1]]));
@@ -551,7 +567,7 @@ function seek(tIn) {
     const regO = alive ? Math.min(easeOut((t - d.down) / 0.04), dissolve) : 0;
     const ex = Math.min(x0, x1), ey = Math.min(y0, y1), ew = Math.abs(x1 - x0), eh = Math.abs(y1 - y0);
     box(R.el, ex - 1.5, ey - 1.5, ew + 3, eh + 3);
-    show(R.el, regO * (t >= TL.back || t < TL.toButton + 0.2 ? 1 : 0), 6);
+    show(R.el, regO * (t >= TL.back || t < TL.toButton + 0.35 ? 1 : 0), 6);
     // handles: after release, gone from the report image
     const hO = Math.min(easeOut((t - d.up) / 0.12), 1 - easeIO((t - TL.fold) / 0.12)) * (t < TL.back ? 1 : 0);
     const hs = [0, 0.5, 1].flatMap(a => [0, 0.5, 1].map(b => [a, b])).filter(([a, b]) => !(a === 0.5 && b === 0.5));
@@ -581,25 +597,28 @@ function seek(tIn) {
       transformOrigin: `${leftOfPin ? '100%' : '0'} ${above ? '100%' : '0'}`,
       transform: `scale(${lerp(0.5, 1, cs)})`,
     });
-    show(R.card, win(t, ct, 0.18, TL.toButton, 0.1), 6);
+    show(R.card, win(t, ct, 0.18, TL.toButton, 0.25), 6);
   });
 
   // send button
-  const bO = win(t, TL.toButton + 0.1, 0.2, TL.terminal, 0.1);
+  const bO = win(t, TL.toButton + 0.4, 0.3, TL.terminal, 0.15);
   show(btnC, bO, 8);
+  // the old label fades before the width moves, the new one after it has mostly arrived
   const labelO = [
-    win(t, TL.toButton + 0.1, 0.2, TL.sending - 0.03, 0.08),
-    win(t, TL.sending + 0.07, 0.14, TL.sent - 0.02, 0.08),
-    win(t, TL.sent + 0.08, 0.14, TL.terminal, 0.1),
+    win(t, TL.toButton + 0.45, 0.3, TL.click + PRESS.down + PRESS.up - 0.15, 0.15),
+    win(t, TL.click + PRESS.down + PRESS.up - 0.12, 0.3, TL.sent - 0.02, 0.15), // crossfades over the old one
+    win(t, TL.sent + 0.1, 0.3, TL.terminal, 0.15),
   ];
-  const lw = labelO.reduce((s, o, i) => s + o * M.labelW[i], 0) / Math.max(0.001, labelO.reduce((s, o) => s + o, 0));
-  const groupW = 22 + 12 + lw;
-  const gx = (hw - groupW) / 2;
+  // Content is centred while the shape is arriving or leaving; in between, it
+  // sits at the button's padding, so a label swap moves only the button's edge.
+  // Both meet exactly at the resting width (padding + mark + gap + label + padding).
+  const gx = t < TL.toButton + GLIDE.form ? (hw - 34 - M.labelW[0]) / 2
+    : t >= TL.terminal ? (hw - 34 - M.labelW[2]) / 2 : 26;
   css(btnMark, { left: gx + 'px', top: (hh - 22) / 2 + 'px' });
   btnLabels.forEach((l, i) => { css(l, { left: gx + 34 + 'px', top: (hh - 28) / 2 + 'px', lineHeight: '28px' }); show(l, labelO[i], 6); });
 
   // terminal: the prompt is already typed in; it waits on Enter
-  show(term, win(t, TL.terminal + 0.14, 0.24, TL.back, 0.1), 10);
+  show(term, win(t, TL.terminal + 0.35, 0.35, TL.back, 0.1), 10);
   const inputTop = 70 + 176;
   css(input, { top: inputTop + 'px' });
   css(hint, { top: inputTop + M.inputH + 12 + 'px' });
@@ -625,7 +644,7 @@ function seek(tIn) {
     boxShadow: `0 0 0 1px rgba(229,229,229,${1 - clamp(dk, 0, 1)}), 0 14px 36px -10px rgba(15,23,42,${0.2 * (1 - clamp(dk, 0, 1))})`,
   });
   css(designCapWrap, { transform: `scale(${D[2] / 1280})` });
-  show(design, win(t, TL.design + 0.05, 0.22, TL.toButton, 0.12), 10);
+  show(design, win(t, TL.design + 0.05, 0.22, TL.toButton, 0.3), 10);
   box(designLabel, 738 - 0, 720 - REP_H / 2 - 36, 300, 22);
   show(designLabel, win(t, TL.design + 0.12, 0.2, TL.fold, 0.1), 6);
 
@@ -681,7 +700,7 @@ function seek(tIn) {
     css(el, { borderBottomWidth: 4 - 3 * p + 'px', background: p > 0.5 ? '#f5f5f5' : '#fff' });
     show(el, kO, 6);
   });
-  const eO = win(t, TL.terminal + 0.4, 0.2, TL.back, 0.12);
+  const eO = win(t, TL.terminal + 0.6, 0.25, TL.back, 0.12);
   const ep = keyPress(TL.enter, TL.enter + 0.12);
   box(keyEnter, 645, 1084 + 3 * ep + (1 - eO) * 12, 150, 72);
   css(keyEnter, { borderBottomWidth: 4 - 3 * ep + 'px', background: ep > 0.5 ? '#f5f5f5' : '#fff' });
